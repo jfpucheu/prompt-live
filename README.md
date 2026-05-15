@@ -13,6 +13,14 @@
 
 ---
 
+## Aperçu
+
+| Fenêtre de contrôle | Mode prompteur | Éditeur |
+|---|---|---|
+| ![Contrôle](docs/screen-control.png) | ![Prompteur](docs/screen-prompter.png) | ![Éditeur](docs/screen-editor.png) |
+
+---
+
 ## Présentation
 
 Prompt-Live est une application macOS pour afficher paroles et accords en temps réel sur scène. Elle est pensée pour les groupes avec plusieurs chanteurs : chaque interprète peut être coloré différemment, les accords sont affichés au-dessus des paroles, et tout défile en douceur depuis la table de régie.
@@ -172,6 +180,44 @@ La CI GitHub Actions produit automatiquement les binaires Intel et Apple Silicon
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+---
+
+## FAQ
+
+**macOS bloque l'ouverture de l'app ("développeur non identifié")**
+> Faire clic droit → **Ouvrir** sur `Prompt-Live.app`. Confirmer dans la boîte de dialogue. À faire une seule fois. L'app n'est pas notarisée Apple (payant).
+
+**macOS dit que l'app est endommagée**
+> Ouvrir un Terminal et lancer :
+> ```bash
+> xattr -cr /Applications/Prompt-Live.app
+> ```
+> Puis relancer l'app normalement.
+
+**L'écran externe ne s'affiche pas en plein écran**
+> Vérifier que l'écran externe est bien détecté par macOS (Réglages Système → Écrans). Prompt-Live utilise automatiquement le deuxième écran au lancement du mode prompteur. Si branché après le démarrage, relancer le mode prompteur.
+
+**L'iPad ne se connecte pas**
+> - Vérifier que l'ordinateur et l'iPad sont sur le **même réseau Wi-Fi**
+> - L'adresse IP est affichée dans la fenêtre de contrôle (ex. `http://192.168.1.10:8765`)
+> - Désactiver temporairement le pare-feu macOS si la connexion échoue (Réglages Système → Réseau → Pare-feu)
+> - Certains réseaux d'entreprise bloquent les connexions locales entre appareils
+
+**Le défilement iPad est décalé par rapport à l'écran principal**
+> La sync se fait par numéro de ligne. Si les tailles de police sont très différentes entre l'écran et l'iPad, la ligne affichée peut légèrement différer — c'est normal.
+
+**Les accords sont décalés par rapport aux paroles**
+> Utiliser uniquement des polices **monospace** (PT Mono est embarquée et sélectionnée par défaut). Helvetica, Arial et autres polices proportionnelles provoquent un décalage.
+
+**Une chanson n'apparaît pas dans la liste**
+> Les fichiers doivent avoir l'extension `.prompt` et être dans le dossier sélectionné. Les fichiers sans numéro de préfixe sont affichés en dernier.
+
+**L'app ne se ferme pas quand un iPad est connecté**
+> Fermer la fenêtre de contrôle (croix rouge). Toutes les fenêtres et le serveur web se ferment ensemble. Si l'app reste en fond, forcer la fermeture avec `Cmd+Q`.
+
+**Modifier un fichier `.prompt` depuis un éditeur externe**
+> Prompt-Live surveille le dossier automatiquement. Toute modification enregistrée dans un éditeur externe est rechargée en direct sans redémarrer l'app.
 
 ---
 
