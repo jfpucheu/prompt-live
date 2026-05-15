@@ -21,18 +21,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python (GitHub-hosted only)
+        if: matrix.arch == 'apple-silicon'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+          python3 -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install pyinstaller
 
       - name: Build app
-        run: pyinstaller prompt-live.spec --clean --noconfirm
+        run: .venv/bin/pyinstaller prompt-live.spec --clean --noconfirm
 
       - name: Zip app
         run: |
