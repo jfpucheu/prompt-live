@@ -12,8 +12,10 @@ jobs:
         include:
           - os: self-hosted
             arch: intel
+            python: python3.12
           - os: macos-14
             arch: apple-silicon
+            python: python3
 
     runs-on: ${{ matrix.os }}
 
@@ -29,7 +31,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python3 -m venv .venv
+          ${{ matrix.python }} -m venv .venv
           .venv/bin/pip install -r requirements.txt
           .venv/bin/pip install pyinstaller
 
