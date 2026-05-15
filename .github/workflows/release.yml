@@ -10,9 +10,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-13
+          - os: macos-12
             arch: intel
-          - os: macos-latest
+          - os: macos-14
             arch: apple-silicon
 
     runs-on: ${{ matrix.os }}
