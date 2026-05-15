@@ -592,7 +592,8 @@ class ControlWindow(QMainWindow):
 
     def _ask_directory(self):
         d = QFileDialog.getExistingDirectory(
-            self, "Choisir le répertoire des chansons", self._last_dir
+            self, "Choisir le répertoire des chansons", self._last_dir,
+            QFileDialog.Option.DontUseNativeDialog,
         )
         if d:
             self._set_dir(d)
@@ -600,7 +601,10 @@ class ControlWindow(QMainWindow):
             self._reload()
 
     def _choose_dir(self):
-        d = QFileDialog.getExistingDirectory(self, "Choisir le répertoire des chansons", self._last_dir)
+        d = QFileDialog.getExistingDirectory(
+            self, "Choisir le répertoire des chansons", self._last_dir,
+            QFileDialog.Option.DontUseNativeDialog,
+        )
         if d:
             self._set_dir(d)
 

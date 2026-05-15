@@ -36,7 +36,6 @@ Prompt-Live est une application macOS pour afficher paroles et accords en temps 
 - Éditeur intégré avec prévisualisation en direct
 - Coloration par chanteur / section
 - Polices monospace embarquées (PT Mono) pour un alignement parfait accords/paroles
-- Import PDF et DOCX
 
 ---
 
