@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-12
+          - os: self-hosted
             arch: intel
           - os: macos-14
             arch: apple-silicon
