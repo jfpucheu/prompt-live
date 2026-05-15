@@ -54,7 +54,7 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
                 singer_color = section.color or label_color
                 singer_html = (
                     f'<span style="color:{singer_color};font-size:{fs_section}px;'
-                    f'font-weight:normal;"> ▸ {esc(section.singer)}</span>'
+                    f'font-weight:bold;"> ▸ {esc(section.singer)}</span>'
                 )
             parts.append(
                 f'<p style="{p_style}white-space:normal;">'
@@ -68,6 +68,14 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
 
             if not line.text.strip():
                 parts.append(f'<p style="{p_style}"><span>&nbsp;</span></p>')
+                continue
+
+            if line.is_note:
+                parts.append(
+                    f'<p style="{p_style}">'
+                    f'<span style="color:#666666;font-style:italic;font-size:{fs_lyrics}px;">'
+                    f'{esc(line.text)}</span></p>'
+                )
                 continue
 
             if line.is_chord:

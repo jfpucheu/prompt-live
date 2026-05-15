@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# macOS
+.DS_Store
+*.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Iconset (intermediate, only keep final .icns)
+logo/*.iconset/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs
+*.log

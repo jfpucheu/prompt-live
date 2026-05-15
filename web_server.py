@@ -7,6 +7,11 @@ import queue
 import socket
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+
+
+class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 
 def _local_ip() -> str:
@@ -23,8 +28,8 @@ def _local_ip() -> str:
 
 _MANIFEST = """\
 {
-  "name": "Promt",
-  "short_name": "Promt",
+  "name": "Prompt-Live",
+  "short_name": "Prompt-Live",
   "display": "fullscreen",
   "background_color": "#000000",
   "theme_color": "#000000",
@@ -41,7 +46,7 @@ _INDEX = """\
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="/manifest.json">
-<title>Promt</title>
+<title>Prompt-Live</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; }
@@ -197,9 +202,10 @@ function connect() {
       window.scrollTo(0, 0);
     } else if (d.type === 'setlist') {
       renderSetlist(d.songs);
-    } else if (d.type === 'scroll') {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      if (max > 0) window.scrollTo(0, max * d.ratio);
+    } else if (d.type === 'scroll_line') {
+      const paras = document.querySelectorAll('#content p');
+      const el = paras[d.index];
+      if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset);
     }
   };
   es.onerror = () => {
@@ -230,12 +236,18 @@ class PromptWebServer:
 
     def start(self) -> str:
         """Démarre le serveur ; retourne l'URL locale (ex. http://192.168.1.5:8765)."""
-        self._server = HTTPServer(("", self._port), self._make_handler())
+        self._server = _ThreadingHTTPServer(("", self._port), self._make_handler())
         threading.Thread(target=self._server.serve_forever, daemon=True).start()
         return f"http://{_local_ip()}:{self._port}"
 
     def stop(self):
         if self._server:
+            with self._lock:
+                for q in self._clients:
+                    try:
+                        q.put_nowait(None)  # débloque les threads SSE
+                    except queue.Full:
+                        pass
             self._server.shutdown()
             self._server = None
 
@@ -250,9 +262,9 @@ class PromptWebServer:
         self._last_setlist = titles
         self._broadcast(json.dumps({"type": "setlist", "songs": titles}))
 
-    def push_scroll(self, ratio: float):
-        """Envoie la position de défilement (0.0 – 1.0)."""
-        self._broadcast(json.dumps({"type": "scroll", "ratio": round(ratio, 4)}))
+    def push_scroll_line(self, index: int):
+        """Envoie l'index du paragraphe visible en haut du viewport."""
+        self._broadcast(json.dumps({"type": "scroll_line", "index": index}))
 
     # ── Interne ──────────────────────────────────────────────────────────────
 
@@ -319,7 +331,10 @@ class PromptWebServer:
                 try:
                     while True:
                         try:
-                            self.wfile.write(q.get(timeout=25))
+                            msg = q.get(timeout=25)
+                            if msg is None:  # sentinel d'arrêt
+                                break
+                            self.wfile.write(msg)
                             self.wfile.flush()
                         except queue.Empty:
                             # Keepalive pour éviter que Safari ferme la connexion

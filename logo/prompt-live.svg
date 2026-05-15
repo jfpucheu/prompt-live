@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#1c1c40"/>
+      <stop offset="100%" stop-color="#07070e"/>
+    </linearGradient>
+    <radialGradient id="glow_center" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#2a2a60" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#07070e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#ff6a2f"/>
+      <stop offset="100%" stop-color="#ffb340"/>
+    </linearGradient>
+    <filter id="line_glow" x="-10%" y="-120%" width="120%" height="340%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="arrow_glow" x="-40%" y="-80%" width="180%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#glow_center)"/>
+
+  <!-- Faint top shine -->
+  <ellipse cx="512" cy="130" rx="340" ry="60" fill="white" fill-opacity="0.04"/>
+
+  <!-- Lyric lines — varied widths to look like real text -->
+  <!-- Line -3 (distant past) -->
+  <rect x="190" y="260" width="430" height="13" rx="6.5" fill="white" fill-opacity="0.09"/>
+
+  <!-- Line -2 -->
+  <rect x="190" y="320" width="580" height="13" rx="6.5" fill="white" fill-opacity="0.14"/>
+
+  <!-- Line -1 (chord) — shorter, slightly thinner -->
+  <rect x="190" y="376" width="310" height="10" rx="5" fill="white" fill-opacity="0.18"/>
+
+  <!-- Line 0 (just above current, lyrics) -->
+  <rect x="190" y="420" width="640" height="13" rx="6.5" fill="white" fill-opacity="0.28"/>
+
+  <!-- === CURRENT LINE === prompt-live text -->
+  <text x="512" y="516"
+        font-family="Helvetica,Arial,sans-serif"
+        font-size="72" font-weight="800"
+        text-anchor="middle" letter-spacing="4"
+        fill="url(#accent)" filter="url(#line_glow)">prompt-live</text>
+
+  <!-- Line +1 (just below) -->
+  <rect x="190" y="538" width="560" height="13" rx="6.5" fill="white" fill-opacity="0.22"/>
+
+  <!-- Line +2 (chord) -->
+  <rect x="190" y="582" width="280" height="10" rx="5" fill="white" fill-opacity="0.14"/>
+
+  <!-- Line +3 -->
+  <rect x="190" y="626" width="600" height="13" rx="6.5" fill="white" fill-opacity="0.12"/>
+
+  <!-- Line +4 (distant future) -->
+  <rect x="190" y="686" width="460" height="13" rx="6.5" fill="white" fill-opacity="0.07"/>
+
+  <!-- Right-pointing arrow cursor on the left of the current line -->
+  <polygon points="104,497  142,479  142,515" fill="url(#accent)" filter="url(#arrow_glow)"/>
+
+</svg>

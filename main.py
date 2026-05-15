@@ -1,5 +1,5 @@
 """
-Promt — Prompteur musical pour groupes live.
+Prompt-Live — Prompteur musical pour groupes live.
 Affiche paroles et accords depuis des fichiers PDF/DOCX numérotés.
 Écran externe si branché, sinon plein écran sur l'écran principal.
 """
@@ -8,12 +8,25 @@ import subprocess
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QLabel, QFileDialog, QFrame, QTextBrowser,
-    QScrollBar, QButtonGroup, QComboBox,
+    QComboBox, QSlider,
 )
-from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QWheelEvent, QMouseEvent
+from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAnimation, QEasingCurve, QPoint
+from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent
+
+import os as _os
+from PyQt6.QtGui import QFontDatabase as _QFontDatabase
+
+def _load_bundled_fonts():
+    fonts_dir = _os.path.join(_os.path.dirname(__file__), "fonts")
+    if _os.path.isdir(fonts_dir):
+        for f in _os.listdir(fonts_dir):
+            if f.lower().endswith((".ttf", ".otf", ".ttc")):
+                _QFontDatabase.addApplicationFont(_os.path.join(fonts_dir, f))
 
 from parsers import load_songs, Song
+
+_SPEED_PX = {1: 60, 2: 100, 3: 160, 4: 240, 5: 340}
+_ANIM_MS  = 380
 from renderer import render_html
 from web_server import PromptWebServer
 from editor import EditorWindow
@@ -29,6 +42,12 @@ class PrompterView(QTextBrowser):
         self._on_prev   = on_prev
         self._on_next   = on_next
         self._on_scroll = on_scroll  # callable(ratio: float)
+        self._scroll_px    = _SPEED_PX[3]
+        self._emit_enabled = True
+        self._anim = QPropertyAnimation(self.verticalScrollBar(), b"value")
+        self._anim.setDuration(_ANIM_MS)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutQuint)
+        self.verticalScrollBar().valueChanged.connect(self._on_value_changed)
         self.setReadOnly(True)
         self.setOpenLinks(False)
         self.setStyleSheet("""
@@ -51,13 +70,40 @@ class PrompterView(QTextBrowser):
             }
         """)
 
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key in (Qt.Key.Key_Right, Qt.Key.Key_PageDown):
+            self._on_next()
+        elif key in (Qt.Key.Key_Left, Qt.Key.Key_PageUp):
+            self._on_prev()
+        elif key == Qt.Key.Key_Down:
+            self._smooth_scroll(self._scroll_px)
+        elif key == Qt.Key.Key_Up:
+            self._smooth_scroll(-self._scroll_px)
+        else:
+            super().keyPressEvent(event)
+
+    def _smooth_scroll(self, delta: int):
+        sb  = self.verticalScrollBar()
+        if self._anim.state() == QPropertyAnimation.State.Running:
+            # Accumule vers la destination courante sans repartir de zéro
+            end = max(0, min(sb.maximum(), int(self._anim.endValue()) + delta))
+            self._anim.stop()
+            self._anim.setStartValue(int(self._anim.currentValue()))
+        else:
+            end = max(0, min(sb.maximum(), sb.value() + delta))
+            self._anim.setStartValue(sb.value())
+        self._anim.setEndValue(end)
+        self._anim.start()
+
+    def _on_value_changed(self, value: int):
+        if self._emit_enabled and self._on_scroll:
+            self._on_scroll(value)
+
     def wheelEvent(self, event: QWheelEvent):
-        sb = self.verticalScrollBar()
-        delta = event.angleDelta().y()
-        sb.setValue(sb.value() - (delta * 80) // 120)
+        ticks = event.angleDelta().y() / 120
+        self._smooth_scroll(int(-ticks * self._scroll_px))
         event.accept()
-        if self._on_scroll and sb.maximum() > 0:
-            self._on_scroll(sb.value() / sb.maximum())
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.RightButton:
@@ -75,7 +121,7 @@ class PrompterWindow(QMainWindow):
     ZOOM_MAX = 3.0
 
     def __init__(self, songs: list[Song], start_index: int = 0, on_navigate=None, on_scroll=None, on_display=None,
-                 font_family: str = "'Courier New',Courier,monospace"):
+                 font_family: str = "'Courier New',Courier,monospace", scroll_speed: int = 3):
         super().__init__()
         self.songs = songs
         self.current_index = start_index
@@ -84,6 +130,7 @@ class PrompterWindow(QMainWindow):
         self._on_navigate  = on_navigate
         self._on_scroll    = on_scroll
         self._on_display   = on_display
+        self._scroll_speed = scroll_speed
         self._font_family  = font_family
 
         self._watcher = QFileSystemWatcher()
@@ -96,7 +143,7 @@ class PrompterWindow(QMainWindow):
         # Empêche la mise en veille écran pendant le show
         self._caffeinate = subprocess.Popen(["caffeinate", "-d"])
 
-        self.setWindowTitle("Promt")
+        self.setWindowTitle("Prompt-Live")
         self.setStyleSheet("background-color: black;")
 
         root = QWidget()
@@ -132,11 +179,12 @@ class PrompterWindow(QMainWindow):
             on_next=self.next_song,
             on_scroll=self._emit_scroll,
         )
+        self.view._scroll_px = _SPEED_PX.get(scroll_speed, 160)
         layout.addWidget(self.view, 1)
 
         # Pied de page
         hint = QLabel(
-            "← clic gauche : chanson précédente   |   molette : défilement   |   clic droit : chanson suivante →"
+            "← / clic gauche : chanson précédente   |   ↑↓ / molette : défilement   |   → / clic droit : chanson suivante"
         )
         hint.setStyleSheet("color: #2a2a2a; font-size: 10px;")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -144,10 +192,6 @@ class PrompterWindow(QMainWindow):
 
         # Raccourcis clavier
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
-        QShortcut(QKeySequence(Qt.Key.Key_Right), self, self.next_song)
-        QShortcut(QKeySequence(Qt.Key.Key_Left), self, self.prev_song)
-        QShortcut(QKeySequence(Qt.Key.Key_PageDown), self, self.next_song)
-        QShortcut(QKeySequence(Qt.Key.Key_PageUp), self, self.prev_song)
         QShortcut(QKeySequence("Ctrl+="), self, self._zoom_in)
         QShortcut(QKeySequence("Ctrl+-"), self, self._zoom_out)
         QShortcut(QKeySequence("A"),      self, self._toggle_chords)
@@ -171,13 +215,14 @@ class PrompterWindow(QMainWindow):
         else:
             self.go_to(index)
 
-    def _emit_scroll(self, ratio: float):
+    def _emit_scroll(self, pos: int):
         if self._on_scroll:
-            self._on_scroll(self, ratio)
+            self._on_scroll(self, pos)
 
-    def set_scroll_ratio(self, ratio: float):
-        sb = self.view.verticalScrollBar()
-        sb.setValue(int(ratio * sb.maximum()))
+    def set_scroll_pos(self, pos: int):
+        self.view._emit_enabled = False
+        self.view.verticalScrollBar().setValue(pos)
+        self.view._emit_enabled = True
 
     def go_to(self, index: int):
         """Positionne cette fenêtre sur la chanson index sans notifier les autres."""
@@ -229,10 +274,9 @@ class PrompterWindow(QMainWindow):
             self.songs[self.current_index] = parse_prompt(song.file_path)
         except Exception:
             return
-        sb = self.view.verticalScrollBar()
-        ratio = sb.value() / sb.maximum() if sb.maximum() > 0 else 0.0
+        pos = self.view.verticalScrollBar().value()
         self._display(self.current_index)
-        self.set_scroll_ratio(ratio)
+        self.set_scroll_pos(pos)
 
     def _display(self, index: int):
         if not self.songs or index >= len(self.songs):
@@ -288,14 +332,20 @@ class ControlWindow(QMainWindow):
         super().__init__()
         self.songs: list[Song] = []
         self._prompters: list[PrompterWindow] = []
-        self._screen_btns: list[QPushButton] = []  # bouton par écran détecté
+        self._screen_btns: list[QPushButton] = []
         self._editor: EditorWindow | None = None
+        self._web_scroll_timer = QTimer()
+        self._web_scroll_timer.setSingleShot(True)
+        self._web_scroll_timer.setInterval(80)
+        self._web_scroll_source: "PrompterWindow | None" = None
+        self._web_scroll_timer.timeout.connect(self._flush_web_scroll)
 
-        settings = QSettings("Promt", "Promt")
+        settings = QSettings("Prompt-Live", "Prompt-Live")
         self._last_dir: str = settings.value("last_dir", "")
-        self._font_family: str = settings.value("font_family", "Courier New")
+        self._font_family: str = settings.value("font_family", "Menlo")
+        self._scroll_speed: int = int(settings.value("scroll_speed", 3))
 
-        self.setWindowTitle("Promt — Contrôle")
+        self.setWindowTitle("Prompt-Live — Contrôle")
         self.setMinimumSize(460, 580)
 
         root = QWidget()
@@ -305,7 +355,7 @@ class ControlWindow(QMainWindow):
         layout.setSpacing(10)
 
         # Titre
-        lbl = QLabel("Promt  —  Prompteur musical")
+        lbl = QLabel("Prompt-Live  —  Prompteur musical")
         lbl.setStyleSheet("font-size: 17px; font-weight: bold;")
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(lbl)
@@ -349,7 +399,7 @@ class ControlWindow(QMainWindow):
         font_row = QHBoxLayout()
         font_row.addWidget(QLabel("Police :"))
         self._font_combo = QComboBox()
-        for name in ["Courier New", "Menlo", "Monaco", "SF Mono", "Consolas", "Andale Mono"]:
+        for name in ["Courier New", "Menlo", "Monaco", "Andale Mono", "PT Mono"]:
             self._font_combo.addItem(name)
         idx = self._font_combo.findText(self._font_family)
         if idx >= 0:
@@ -357,6 +407,22 @@ class ControlWindow(QMainWindow):
         self._font_combo.currentTextChanged.connect(self._on_font_changed)
         font_row.addWidget(self._font_combo, 1)
         layout.addLayout(font_row)
+
+        # ── Vitesse de défilement ──────────────────────────────────────────────
+        speed_row = QHBoxLayout()
+        speed_row.addWidget(QLabel("Défilement :"))
+        self._speed_slider = QSlider(Qt.Orientation.Horizontal)
+        self._speed_slider.setRange(1, 5)
+        self._speed_slider.setValue(self._scroll_speed)
+        self._speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self._speed_slider.setTickInterval(1)
+        self._speed_slider.valueChanged.connect(self._on_speed_changed)
+        speed_row.addWidget(self._speed_slider, 1)
+        lbl_slow = QLabel("Lent"); lbl_slow.setStyleSheet("font-size:10px;color:#888;")
+        lbl_fast = QLabel("Rapide"); lbl_fast.setStyleSheet("font-size:10px;color:#888;")
+        speed_row.insertWidget(1, lbl_slow)
+        speed_row.addWidget(lbl_fast)
+        layout.addLayout(speed_row)
 
         # ── Sélection des écrans ───────────────────────────────────────────────
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -461,15 +527,21 @@ class ControlWindow(QMainWindow):
 
     # ── Police ────────────────────────────────────────────────────────────────
 
+    def _on_speed_changed(self, value: int):
+        self._scroll_speed = value
+        QSettings("Prompt-Live", "Prompt-Live").setValue("scroll_speed", value)
+        for p in self._prompters:
+            p.view._scroll_px = _SPEED_PX.get(value, 160)
+
     def _on_font_changed(self, name: str):
         self._font_family = name
-        QSettings("Promt", "Promt").setValue("font_family", name)
+        QSettings("Prompt-Live", "Prompt-Live").setValue("font_family", name)
         for p in self._prompters:
             p._font_family = f"'{name}',monospace"
             p._display(p.current_index)
 
     def _css_font(self) -> str:
-        return f"'{self._font_family}',monospace"
+        return f"'{self._font_family}','Courier New',Courier"
 
     # ── Gestion des écrans ────────────────────────────────────────────────────
 
@@ -535,7 +607,7 @@ class ControlWindow(QMainWindow):
     def _set_dir(self, d: str):
         self._last_dir = d
         self.dir_label.setText(d)
-        QSettings("Promt", "Promt").setValue("last_dir", d)
+        QSettings("Prompt-Live", "Prompt-Live").setValue("last_dir", d)
         self._reload()
         if self._editor and self._editor.isVisible():
             self._editor.set_directory(d)
@@ -584,11 +656,19 @@ class ControlWindow(QMainWindow):
             p.go_to(index)
         self.song_list.setCurrentRow(index)
 
-    def _on_scroll(self, source: PrompterWindow, ratio: float):
+    def _flush_web_scroll(self):
+        if self._web_scroll_source and not self._web_scroll_source.isHidden():
+            cursor = self._web_scroll_source.view.cursorForPosition(QPoint(0, 1))
+            self._web_server.push_scroll_line(cursor.block().blockNumber())
+        self._web_scroll_source = None
+
+    def _on_scroll(self, source: PrompterWindow, pos: int):
         for p in self._prompters:
             if p is not source:
-                p.set_scroll_ratio(ratio)
-        self._web_server.push_scroll(ratio)
+                p.set_scroll_pos(pos)
+        self._web_scroll_source = source
+        if not self._web_scroll_timer.isActive():
+            self._web_scroll_timer.start()
 
     # ── Lancement ─────────────────────────────────────────────────────────────
 
@@ -613,7 +693,8 @@ class ControlWindow(QMainWindow):
                                on_navigate=self._on_navigate,
                                on_scroll=self._on_scroll,
                                on_display=self._web_server.push_song if i == 0 else None,
-                               font_family=self._css_font())
+                               font_family=self._css_font(),
+                               scroll_speed=self._scroll_speed)
             p.setGeometry(scr.geometry())
             p.showFullScreen()
             self._prompters.append(p)
@@ -629,14 +710,22 @@ class ControlWindow(QMainWindow):
         self.btn_launch.setEnabled(bool(self.songs))
         self._web_server.push_setlist([s.title for s in self.songs])
 
+    def closeEvent(self, event):
+        for p in self._prompters:
+            p.close()
+        self._prompters.clear()
+        self._web_server.stop()
+        event.accept()
+
 
 # ─── Point d'entrée ───────────────────────────────────────────────────────────
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("Promt")
-    app.setOrganizationName("Promt")
+    app.setApplicationName("Prompt-Live")
+    app.setOrganizationName("Prompt-Live")
 
+    _load_bundled_fonts()
     window = ControlWindow()
     window.show()
 

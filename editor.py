@@ -46,11 +46,12 @@ def _extract_header(content: str) -> str:
 # ── Métadonnées par bloc ──────────────────────────────────────────────────────
 
 class _BD(QTextBlockUserData):
-    def __init__(self, tag='', is_section=False, is_chord=False):
+    def __init__(self, tag='', is_section=False, is_chord=False, is_note=False):
         super().__init__()
         self.tag        = tag
         self.is_section = is_section
         self.is_chord   = is_chord
+        self.is_note    = is_note
 
 
 # ── Bouton couleur ────────────────────────────────────────────────────────────
@@ -101,7 +102,7 @@ class _SongEdit(QTextEdit):
             fmt.setForeground(QColor("#ffffff"))
             fmt.setFontPointSize(self._lyrics_size)
             fmt.setFontWeight(700)
-            fmt.setFontFamily(self._font_family)
+            fmt.setFontFamilies([self._font_family])
             self.textCursor().insertBlock(QTextBlockFormat(), fmt)
         else:
             super().keyPressEvent(event)
@@ -142,11 +143,6 @@ class _SettingsPanel(QScrollArea):
         self._titre = QLineEdit()
         self._titre.textChanged.connect(self.meta_changed)
         self._add_row("Titre", self._titre)
-
-        self._notes = QLineEdit()
-        self._notes.setPlaceholderText("Capo 2, tempo…")
-        self._notes.textChanged.connect(self.meta_changed)
-        self._add_row("Notes", self._notes)
 
         # ── Tailles ───────────────────────────────────────────────────────────
         self._vbox.addWidget(self._sep_label("TAILLES (px)"))
@@ -201,7 +197,6 @@ class _SettingsPanel(QScrollArea):
     def load(self, song):
         for w, sig, val in [
             (self._titre,      'textChanged', song.title),
-            (self._notes,      'textChanged', song.notes),
             (self._sz_lyrics,  'valueChanged', song.font_lyrics),
             (self._sz_chords,  'valueChanged', song.font_chords),
             (self._sz_section, 'valueChanged', song.font_section),
@@ -290,7 +285,6 @@ class _SettingsPanel(QScrollArea):
     # ── Getters pour la sauvegarde ────────────────────────────────────────────
 
     def titre(self):       return self._titre.text().strip()
-    def notes(self):       return self._notes.text().strip()
     def show_chords(self): return self._show_chords.isChecked()
 
     # ── Helpers UI ────────────────────────────────────────────────────────────
@@ -339,8 +333,9 @@ class EditorWindow(QMainWindow):
         self._modified     = False
         self._song         = None
 
-        self.setWindowTitle("Promt — Éditeur")
-        self.setMinimumSize(860, 640)
+        self.setWindowTitle("Prompt-Live — Éditeur")
+        self.setMinimumSize(1200, 800)
+        self.resize(1400, 900)
 
         root = QWidget()
         self.setCentralWidget(root)
@@ -563,7 +558,7 @@ class EditorWindow(QMainWindow):
                 fmt_lbl.setForeground(QColor(song.section_color))
                 fmt_lbl.setFontPointSize(float(song.font_section))
                 fmt_lbl.setFontWeight(700)
-                fmt_lbl.setFontFamily(self._font_family)
+                fmt_lbl.setFontFamilies([self._font_family])
                 cursor.insertText(f"[{section.label}]", fmt_lbl)
 
                 if section.singer:
@@ -571,8 +566,8 @@ class EditorWindow(QMainWindow):
                     fmt_sg = QTextCharFormat()
                     fmt_sg.setForeground(QColor(tag_color))
                     fmt_sg.setFontPointSize(float(song.font_section))
-                    fmt_sg.setFontWeight(400)
-                    fmt_sg.setFontFamily(self._font_family)
+                    fmt_sg.setFontWeight(700)
+                    fmt_sg.setFontFamilies([self._font_family])
                     cursor.insertText(f" ▸ {section.singer}", fmt_sg)
 
                 cursor.block().setUserData(_BD(tag=section.singer or "", is_section=True))
@@ -582,16 +577,21 @@ class EditorWindow(QMainWindow):
                     self._ins(cursor, line.text,
                               song.chord_color, song.font_chords,
                               bd=_BD(is_chord=True), first=first)
+                elif line.is_note:
+                    self._ins(cursor, line.text, "#666666", song.font_lyrics,
+                              italic=True, bd=_BD(is_note=True), first=first)
                 else:
                     color = line.color or section.color or "#ffffff"
+                    # Attribue le tag du chanteur qui contrôle la couleur de cette ligne
+                    effective_tag = line.singer or ("" if line.color else (section.singer or ""))
                     self._ins(cursor, line.text, color, song.font_lyrics,
-                              bd=_BD(tag=line.singer or ""), first=first)
+                              bd=_BD(tag=effective_tag), first=first)
                 first = False
 
         self._edit.blockSignals(False)
         self._edit.verticalScrollBar().setValue(0)
 
-    def _ins(self, cursor, text, color, size, bold=False, bd=None, first=False):
+    def _ins(self, cursor, text, color, size, bold=False, italic=False, bd=None, first=False):
         lh = self._edit._lyrics_size * 1.45
         bf = QTextBlockFormat()
         bf.setLineHeight(lh, QTextBlockFormat.LineHeightTypes.FixedHeight.value)
@@ -602,8 +602,9 @@ class EditorWindow(QMainWindow):
         fmt = QTextCharFormat()
         fmt.setForeground(QColor(color))
         fmt.setFontPointSize(float(size))
-        fmt.setFontWeight(700)
-        fmt.setFontFamily(self._font_family)
+        fmt.setFontWeight(400 if italic else 700)
+        fmt.setFontItalic(italic)
+        fmt.setFontFamilies([self._font_family])
         cursor.insertText(text, fmt)
         if bd:
             cursor.block().setUserData(bd)
@@ -708,9 +709,10 @@ class EditorWindow(QMainWindow):
             if bd.is_section:
                 if bd.tag and bd.tag.lower() == name.lower():
                     bd.tag = ""
+                    self._recolor_section_lines(block, "", "#ffffff")
                 else:
                     bd.tag = name
-                    self._clear_section_line_tags(block)
+                    self._recolor_section_lines(block, name, color)
                 self._render_section_block(block, bd)
             else:
                 if bd.tag and bd.tag.lower() == name.lower():
@@ -722,6 +724,16 @@ class EditorWindow(QMainWindow):
 
         self._on_selection(toggle)
 
+    def _section_singer_for(self, block) -> str:
+        """Remonte le document pour trouver le chanteur de la section parente."""
+        b = block.previous()
+        while b.isValid():
+            bd = b.userData()
+            if bd and bd.is_section:
+                return bd.tag or ""
+            b = b.previous()
+        return ""
+
     def _remove_tag(self):
         def clear(block, bd):
             if bd.is_chord:
@@ -731,13 +743,19 @@ class EditorWindow(QMainWindow):
                     bd.tag = ""
                     self._render_section_block(block, bd)
             else:
-                bd.tag = ""
-                _recolor(block, "#ffffff")
+                section_singer = self._section_singer_for(block)
+                if section_singer and self._song:
+                    bd.tag = section_singer
+                    color = self._song.tags.get(section_singer.lower(), "#ffffff")
+                else:
+                    bd.tag = ""
+                    color = "#ffffff"
+                _recolor(block, color)
 
         self._on_selection(clear)
 
-    def _clear_section_line_tags(self, section_block):
-        """Retire les @tags de toutes les lignes de paroles de la section donnée."""
+    def _recolor_section_lines(self, section_block, singer: str, color: str):
+        """Recolore toutes les lignes de la section avec la couleur du chanteur (ou blanc)."""
         block = section_block.next()
         while block.isValid():
             bd = block.userData()
@@ -745,9 +763,9 @@ class EditorWindow(QMainWindow):
                 bd = _BD(); block.setUserData(bd)
             if bd.is_section:
                 break
-            if not bd.is_chord and bd.tag:
-                bd.tag = ""
-                _recolor(block, "#ffffff")
+            if not bd.is_chord and not bd.is_note:
+                bd.tag = singer
+                _recolor(block, color)
             block = block.next()
 
     def _on_selection(self, fn):
@@ -910,8 +928,6 @@ class EditorWindow(QMainWindow):
         s = self._song
         p = self._panel
         lines = [f"Titre: {p.titre() or s.title}"]
-        if p.notes():
-            lines.append(f"Notes: {p.notes()}")
         lines += [
             f"TailleParoles: {s.font_lyrics}",
             f"TailleAccords: {s.font_chords}",
@@ -959,7 +975,7 @@ class EditorWindow(QMainWindow):
         self._btn_save.setEnabled(bool(self._current_path))
         name = os.path.basename(self._current_path) if self._current_path else ""
         dot  = " •" if v and name else ""
-        self.setWindowTitle(f"Promt — Éditeur{('  —  ' + name + dot) if name else ''}")
+        self.setWindowTitle(f"Prompt-Live — Éditeur{('  —  ' + name + dot) if name else ''}")
 
     def _set_status(self, msg: str):
         self._lbl_status.setText(msg)

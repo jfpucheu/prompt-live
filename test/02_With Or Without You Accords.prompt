@@ -1,24 +1,22 @@
 Titre: With or without you - U2
-Notes: Clé D , Pas de capo
-
 TailleParoles: 60
 TailleAccords: 40
-TailleSection: 40
-
+TailleSection: 50
 CouleurSection: #FFFFFF
 CouleurAccords: #FFE055
 
-@Vanessa: #FF5555
-@Guillaume: #00d9ff
+@Vanessa: #21F069
+@Guillaume: #00D9FF
 @Armelle: #CC66FF
-@All: #ffffff
+@All: #FFFFFF
 
 [Intro]@All
+(Clé D , Pas de capo)
 D A Bm G
 D A Bm G
  
-[Verse 1] @Guillaume
-
+[Verse 1]@Guillaume
+ 
 D           A                Bm
   See the stone set in your eyes
           G                  D
@@ -32,13 +30,13 @@ On a bed of nails she makes me wait
        A        Bm       G
 And I wait, without you
  
-[Chorus] @All
+[Chorus]@All
             D            A
 With or without you
             Bm           G
 With or without you
  
-[Verse 2] @Vanessa
+[Verse 2]@Vanessa
 D               A                 Bm
   Through the storm we reach the shore
             G               D
@@ -46,7 +44,7 @@ You give it all but I want more
          A      Bm        G
 And I’m waiting for you
  
-[Chorus] @all
+[Chorus]@All
             D         A
 With or without you
            Bm          G
@@ -59,7 +57,7 @@ With or without you
 [Instrumental]
 D A Bm G
  
-[Bridge] @all
+[Bridge]@All
          D             A
 And you give yourself away
          Bm            G

@@ -51,6 +51,7 @@ class PromptLine:
     color: Optional[str] = None   # None = hérite de la section ou blanc
     singer: Optional[str] = None  # prénom à afficher si balise sur la ligne
     is_chord: bool = False
+    is_note: bool = False
 
 
 @dataclass
@@ -115,12 +116,17 @@ def _parse_lines(lines: list, file_path: str) -> Song:
 
     # ── En-tête ───────────────────────────────────────────────────────────────
     i = 0
+    header_notes: list[str] = []
     while i < len(lines):
         line = lines[i]
         if _SECTION_RE.match(line.strip()):
             break
         stripped = line.strip()
         sl = stripped.lower()
+        if stripped.startswith('('):
+            header_notes.append(stripped)
+            i += 1
+            continue
         if sl.startswith("titre:"):
             title = stripped.split(":", 1)[1].strip()
         elif sl.startswith("notes:"):
@@ -198,14 +204,20 @@ def _parse_lines(lines: list, file_path: str) -> Song:
             line_singer = None
             text = line
 
+        is_note = text.strip().startswith('(')
         current.lines.append(PromptLine(
             text=text,
             color=line_color,
             singer=line_singer,
-            is_chord=is_chord_line(text),
+            is_chord=False if is_note else is_chord_line(text),
+            is_note=is_note,
         ))
 
     flush()
+
+    if header_notes and sections:
+        for note in reversed(header_notes):
+            sections[0].lines.insert(0, PromptLine(text=note, is_note=True))
 
     return Song(
         title=title,
@@ -242,6 +254,6 @@ def load_songs(directory: str) -> list[Song]:
         try:
             songs.append(parse_prompt(os.path.join(directory, filename)))
         except Exception as e:
-            print(f"[Promt] Erreur '{filename}': {e}")
+            print(f"[Prompt-Live] Erreur '{filename}': {e}")
     songs.sort(key=lambda s: s.order)
     return songs
