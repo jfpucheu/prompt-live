@@ -62,7 +62,11 @@ Rendez-vous sur la page [**Releases**](https://github.com/jfpucheu/prompt-live/r
 
 Dézipper et glisser `Prompt-Live.app` dans votre dossier Applications.
 
-> **Sécurité macOS** : au premier lancement, faire clic droit → Ouvrir si macOS bloque l'application (non notarisée).
+> **Sécurité macOS** : l'application n'est pas notarisée Apple. Au premier lancement, macOS peut bloquer silencieusement son démarrage. Ouvrir un Terminal et lancer :
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/Prompt-Live.app
+> ```
+> Puis lancer l'app normalement.
 
 ---
 
@@ -184,15 +188,15 @@ git push origin v1.0.0
 
 ## FAQ
 
-**macOS bloque l'ouverture de l'app ("développeur non identifié")**
-> Faire clic droit → **Ouvrir** sur `Prompt-Live.app`. Confirmer dans la boîte de dialogue. À faire une seule fois. L'app n'est pas notarisée Apple (payant).
-
-**macOS dit que l'app est endommagée**
-> Ouvrir un Terminal et lancer :
+**L'app ne démarre pas (aucun message, aucune fenêtre)**
+> macOS bloque silencieusement les apps téléchargées non notarisées. Ouvrir un Terminal et lancer :
 > ```bash
-> xattr -cr /Applications/Prompt-Live.app
+> xattr -dr com.apple.quarantine /Applications/Prompt-Live.app
 > ```
 > Puis relancer l'app normalement.
+
+**macOS bloque l'ouverture de l'app ("développeur non identifié")**
+> Faire clic droit → **Ouvrir** sur `Prompt-Live.app`. Confirmer dans la boîte de dialogue. À faire une seule fois.
 
 **L'écran externe ne s'affiche pas en plein écran**
 > Vérifier que l'écran externe est bien détecté par macOS (Réglages Système → Écrans). Prompt-Live utilise automatiquement le deuxième écran au lancement du mode prompteur. Si branché après le démarrage, relancer le mode prompteur.

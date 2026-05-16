@@ -38,10 +38,60 @@ jobs:
       - name: Build app
         run: .venv/bin/pyinstaller prompt-live.spec --clean --noconfirm
 
+      - name: Check signing configuration
+        id: signing
+        env:
+          CERT: ${{ secrets.MACOS_CERTIFICATE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          [ -n "$CERT" ]     && echo "has_cert=true"  >> $GITHUB_OUTPUT || echo "has_cert=false"  >> $GITHUB_OUTPUT
+          [ -n "$APPLE_ID" ] && echo "has_notary=true" >> $GITHUB_OUTPUT || echo "has_notary=false" >> $GITHUB_OUTPUT
+
+      - name: Import signing certificate
+        if: steps.signing.outputs.has_cert == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_KEYCHAIN_PWD: ${{ secrets.MACOS_KEYCHAIN_PWD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$MACOS_KEYCHAIN_PWD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PWD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_KEYCHAIN_PWD" build.keychain
+          rm certificate.p12
+
+      - name: Sign app
+        if: steps.signing.outputs.has_cert == 'true'
+        env:
+          MACOS_IDENTITY: ${{ secrets.MACOS_IDENTITY }}
+        run: |
+          codesign --force --options runtime --deep \
+            --entitlements entitlements.plist \
+            --sign "$MACOS_IDENTITY" \
+            dist/Prompt-Live.app
+
+      - name: Notarize app
+        if: steps.signing.outputs.has_notary == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent dist/Prompt-Live.app Prompt-Live-notarize.zip
+          xcrun notarytool submit Prompt-Live-notarize.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple dist/Prompt-Live.app
+          rm Prompt-Live-notarize.zip
+
       - name: Zip app
         run: |
           cd dist
-          zip -r "../Prompt-Live-${{ matrix.arch }}.zip" Prompt-Live.app
+          ditto -c -k --keepParent Prompt-Live.app "../Prompt-Live-${{ matrix.arch }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

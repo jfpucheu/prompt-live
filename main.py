@@ -14,10 +14,12 @@ from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAni
 from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent
 
 import os as _os
+import sys as _sys
 from PyQt6.QtGui import QFontDatabase as _QFontDatabase
 
 def _load_bundled_fonts():
-    fonts_dir = _os.path.join(_os.path.dirname(__file__), "fonts")
+    base = getattr(_sys, "_MEIPASS", _os.path.dirname(_os.path.abspath(__file__)))
+    fonts_dir = _os.path.join(base, "fonts")
     if _os.path.isdir(fonts_dir):
         for f in _os.listdir(fonts_dir):
             if f.lower().endswith((".ttf", ".otf", ".ttc")):
