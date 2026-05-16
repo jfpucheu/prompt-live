@@ -15,7 +15,7 @@ jobs:
             arch: intel
             python: python3.12
           - os: macos-14
-            arch: apple-silicon
+            arch: silicon
             python: python3
 
     runs-on: ${{ matrix.os }}
@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python (GitHub-hosted only)
-        if: matrix.arch == 'apple-silicon'
+        if: matrix.arch == 'silicon'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
