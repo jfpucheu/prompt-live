@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: self-hosted
@@ -101,6 +102,7 @@ jobs:
 
   release:
     needs: build
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: write
