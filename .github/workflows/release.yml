@@ -91,13 +91,13 @@ jobs:
       - name: Zip app
         run: |
           cd dist
-          ditto -c -k --keepParent Prompt-Live.app "../Prompt-Live-${{ matrix.arch }}.zip"
+          ditto -c -k --keepParent Prompt-Live.app "../Prompt-Live-apple-${{ matrix.arch }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Prompt-Live-${{ matrix.arch }}
-          path: Prompt-Live-${{ matrix.arch }}.zip
+          name: Prompt-Live-apple-${{ matrix.arch }}
+          path: Prompt-Live-apple-${{ matrix.arch }}.zip
 
   release:
     needs: build
@@ -115,5 +115,5 @@ jobs:
           name: Prompt-Live ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            Prompt-Live-intel/Prompt-Live-intel.zip
+            Prompt-Live-apple-intel/Prompt-Live-apple-intel.zip
             Prompt-Live-apple-silicon/Prompt-Live-apple-silicon.zip

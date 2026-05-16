@@ -58,7 +58,7 @@ Rendez-vous sur la page [**Releases**](https://github.com/jfpucheu/prompt-live/r
 
 | Version | Intel (x86_64) | Apple Silicon (M1/M2/M3) |
 |---------|---------------|--------------------------|
-| Dernière | `Prompt-Live-intel.zip` | `Prompt-Live-apple-silicon.zip` |
+| Dernière | `Prompt-Live-apple-intel.zip` | `Prompt-Live-apple-silicon.zip` |
 
 Dézipper et glisser `Prompt-Live.app` dans votre dossier Applications.
 
