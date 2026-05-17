@@ -8,9 +8,9 @@ import subprocess
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QLabel, QFileDialog, QFrame, QTextBrowser,
-    QComboBox, QSlider,
+    QComboBox, QSlider, QCheckBox,
 )
-from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAnimation, QEasingCurve, QPoint
+from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAnimation, QEasingCurve, QPoint, QObject, QEvent
 from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent
 
 import os as _os
@@ -29,6 +29,79 @@ from parsers import load_songs, Song
 
 _SPEED_PX = {1: 60, 2: 100, 3: 160, 4: 240, 5: 340}
 _ANIM_MS  = 380
+
+# ─── Support pédale Bluetooth ─────────────────────────────────────────────────
+# Touches interceptées globalement pour la pédale (configurables ici)
+_PEDAL_DOWN_KEYS = {Qt.Key.Key_Down, Qt.Key.Key_Space, Qt.Key.Key_F5}
+_PEDAL_UP_KEYS   = {Qt.Key.Key_Up, Qt.Key.Key_F6}
+
+
+class _PedalFilter(QObject):
+    """Filtre d'événements global pour la pédale Bluetooth.
+
+    Appui bas  : défilement vers le bas.
+    2 appuis consécutifs en bas de page : chanson suivante.
+    Appui haut : défilement vers le haut.
+    """
+
+    BOTTOM_MARGIN = 8  # px de tolérance pour "en bas"
+
+    def __init__(self, get_prompters):
+        super().__init__()
+        self._get_prompters = get_prompters
+        self.enabled       = True
+        self._scroll_px    = _SPEED_PX[3]
+        self._bottom_count = 0  # appuis consécutifs en bas de page
+        self._top_count    = 0  # appuis consécutifs en haut de page
+
+    def _at_bottom(self, view) -> bool:
+        sb = view.verticalScrollBar()
+        return sb.maximum() == 0 or sb.value() >= sb.maximum() - self.BOTTOM_MARGIN
+
+    def _at_top(self, view) -> bool:
+        return view.verticalScrollBar().value() <= self.BOTTOM_MARGIN
+
+    def eventFilter(self, _obj, event):
+        if not self.enabled:
+            return False
+        if event.type() != QEvent.Type.KeyPress or event.isAutoRepeat():
+            return False
+
+        key = event.key()
+        is_down = key in _PEDAL_DOWN_KEYS
+        is_up   = key in _PEDAL_UP_KEYS
+        if not (is_down or is_up):
+            return False
+
+        prompters = self._get_prompters()
+        if not prompters:
+            return False
+
+        view = prompters[0].view
+
+        if is_down:
+            self._top_count = 0
+            if self._at_bottom(view):
+                self._bottom_count += 1
+                if self._bottom_count >= 2:
+                    self._bottom_count = 0
+                    prompters[0].next_song()
+            else:
+                self._bottom_count = 0
+                view._smooth_scroll(self._scroll_px)
+            return True
+
+        # is_up
+        self._bottom_count = 0
+        if self._at_top(view):
+            self._top_count += 1
+            if self._top_count >= 2:
+                self._top_count = 0
+                prompters[0].prev_song()
+        else:
+            self._top_count = 0
+            view._smooth_scroll(-self._scroll_px)
+        return True
 from renderer import render_html
 from web_server import PromptWebServer
 from editor import EditorWindow
@@ -78,9 +151,9 @@ class PrompterView(QTextBrowser):
             self._on_next()
         elif key in (Qt.Key.Key_Left, Qt.Key.Key_PageUp):
             self._on_prev()
-        elif key == Qt.Key.Key_Down:
+        elif key in (Qt.Key.Key_Down, Qt.Key.Key_Space, Qt.Key.Key_F5):
             self._smooth_scroll(self._scroll_px)
-        elif key == Qt.Key.Key_Up:
+        elif key in (Qt.Key.Key_Up, Qt.Key.Key_F6):
             self._smooth_scroll(-self._scroll_px)
         else:
             super().keyPressEvent(event)
@@ -513,6 +586,44 @@ class ControlWindow(QMainWindow):
 
         self._build_screen_buttons()
 
+        # ── Pédale Bluetooth ──────────────────────────────────────────────────
+        sep3 = QFrame(); sep3.setFrameShape(QFrame.Shape.HLine)
+        layout.addWidget(sep3)
+
+        settings = QSettings("Prompt-Live", "Prompt-Live")
+        pedal_enabled = bool(settings.value("pedal_enabled", True, type=bool))
+        pedal_speed   = int(settings.value("pedal_speed", 3))
+
+        pedal_row = QHBoxLayout()
+        self._pedal_cb = QCheckBox("Pédale BT")
+        self._pedal_cb.setChecked(pedal_enabled)
+        self._pedal_cb.toggled.connect(self._on_pedal_toggled)
+        pedal_row.addWidget(self._pedal_cb)
+
+        pedal_row.addSpacing(12)
+        pedal_row.addWidget(QLabel("Vitesse :"))
+        self._pedal_speed_slider = QSlider(Qt.Orientation.Horizontal)
+        self._pedal_speed_slider.setRange(1, 5)
+        self._pedal_speed_slider.setValue(pedal_speed)
+        self._pedal_speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self._pedal_speed_slider.setTickInterval(1)
+        self._pedal_speed_slider.valueChanged.connect(self._on_pedal_speed_changed)
+        pedal_row.addWidget(self._pedal_speed_slider, 1)
+        lbl_ps = QLabel("Lent"); lbl_ps.setStyleSheet("font-size:10px;color:#888;")
+        lbl_pf = QLabel("Rapide"); lbl_pf.setStyleSheet("font-size:10px;color:#888;")
+        pedal_row.insertWidget(pedal_row.count() - 1, lbl_ps)
+        pedal_row.addWidget(lbl_pf)
+        layout.addLayout(pedal_row)
+
+        pedal_hint = QLabel("↓ / Espace  défilement     2× ↓ en bas de page → chanson suivante")
+        pedal_hint.setStyleSheet("font-size: 10px; color: #888;")
+        layout.addWidget(pedal_hint)
+
+        self._pedal_filter = _PedalFilter(lambda: self._prompters)
+        self._pedal_filter.enabled    = pedal_enabled
+        self._pedal_filter._scroll_px = _SPEED_PX.get(pedal_speed, 160)
+        QApplication.instance().installEventFilter(self._pedal_filter)
+
         # Serveur web — démarre immédiatement, affiche l'URL
         self._web_server = PromptWebServer()
         try:
@@ -526,6 +637,16 @@ class ControlWindow(QMainWindow):
         QApplication.instance().screenRemoved.connect(lambda _: self._build_screen_buttons())
 
         QTimer.singleShot(0, self._ask_directory)
+
+    # ── Pédale ────────────────────────────────────────────────────────────────
+
+    def _on_pedal_toggled(self, checked: bool):
+        self._pedal_filter.enabled = checked
+        QSettings("Prompt-Live", "Prompt-Live").setValue("pedal_enabled", checked)
+
+    def _on_pedal_speed_changed(self, value: int):
+        self._pedal_filter._scroll_px = _SPEED_PX.get(value, 160)
+        QSettings("Prompt-Live", "Prompt-Live").setValue("pedal_speed", value)
 
     # ── Police ────────────────────────────────────────────────────────────────
 

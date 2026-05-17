@@ -53,7 +53,7 @@ app = BUNDLE(
     bundle_identifier='com.promptlive.app',
     info_plist={
         'NSHighResolutionCapable': True,
-        'CFBundleShortVersionString': '1.0.0',
+        'CFBundleShortVersionString': '1.1.0',
         'LSMinimumSystemVersion': '11.0',
     },
 )

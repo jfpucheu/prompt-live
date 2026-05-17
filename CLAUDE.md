@@ -14,7 +14,7 @@ python main.py
 
 | Fichier | Rôle |
 |---------|------|
-| `main.py` | Fenêtre de contrôle (`ControlWindow`), fenêtre prompteur (`PrompterWindow`), flash d'écran |
+| `main.py` | Fenêtre de contrôle (`ControlWindow`), fenêtre prompteur (`PrompterWindow`), flash d'écran, filtre pédale (`_PedalFilter`) |
 | `editor.py` | Éditeur WYSIWYG des fichiers `.prompt` |
 | `renderer.py` | Génération HTML depuis un objet `Song` — utilisé par le prompteur desktop ET l'iPad |
 | `parsers.py` | Parsing des fichiers `.prompt` → objets `Song`, `Section`, `PromptLine` |
@@ -58,6 +58,14 @@ Objet central passé partout.
 - `font-size:{fs_lyrics}px` sur chaque `<p>` force QTextBrowser à utiliser la bonne hauteur de bloc
 - Police actuelle : `'Courier New',Courier,monospace` (monospace obligatoire pour l'alignement)
 
+### `_PedalFilter` (main.py)
+Filtre d'événements installé sur `QApplication` — intercepte les touches pédale globalement.
+- `_PEDAL_DOWN_KEYS` / `_PEDAL_UP_KEYS` : sets de `Qt.Key` configurables en tête de fichier
+- `_bottom_count` / `_top_count` : compteurs d'appuis consécutifs en bas/haut de page
+- 2 appuis en bas → `next_song()` ; 2 appuis en haut → `prev_song()`
+- `enabled` et `_scroll_px` : pilotés par la section *Pédale BT* de `ControlWindow`
+- **IMPORTANT** : le filtre intercepte aussi `Key_Down`/`Key_Up` clavier — les auto-repeats sont laissés passer (`return False`) pour ne pas bloquer le défilement clavier continu
+
 ### `PromptWebServer` (web_server.py)
 - SSE sur `/events` : messages JSON `{type: "song"|"setlist"|"scroll", ...}`
 - `push_song(html)` : envoie le HTML complet d'une chanson
@@ -73,12 +81,15 @@ Points importants :
 - Lignes d'accords détectées automatiquement si tous les tokens matchent `[A-G][#b]?...`
 - Les espaces dans les lignes d'accords doivent être calibrés en **Courier New** — c'est la seule police qui garantit l'alignement avec le rendu
 
-## Réglages persistants (`QSettings "Promt"/"Promt"`)
+## Réglages persistants (`QSettings "Prompt-Live"/"Prompt-Live"`)
 
 | Clé | Valeur |
 |-----|--------|
 | `last_dir` | Dernier répertoire de chansons |
 | `font_family` | Police monospace choisie |
+| `scroll_speed` | Vitesse défilement clavier (1–5, défaut 3) |
+| `pedal_enabled` | Pédale activée (bool, défaut `True`) |
+| `pedal_speed` | Vitesse défilement pédale (1–5, défaut 3) |
 
 ## Pièges connus
 

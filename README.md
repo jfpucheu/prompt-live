@@ -31,6 +31,7 @@ Prompt-Live est une application macOS pour afficher paroles et accords en temps 
 - Affichage plein écran sur l'écran externe (retro-projecteur, TV scène…)
 - Défilement fluide avec animation, vitesse réglable (5 niveaux)
 - Navigation au clavier : ↑↓ défilement, ←→ chanson précédente/suivante
+- Support pédalier Bluetooth HID (↓ défile, 2× bas = chanson suivante, 2× haut = chanson précédente)
 - Synchronisation iPad/tablette via navigateur web (serveur SSE intégré)
 - Support multi-écrans : même ligne en haut sur tous les écrans
 - Éditeur intégré avec prévisualisation en direct
@@ -153,6 +154,21 @@ Préfixer les fichiers par un numéro pour définir l'ordre :
 | `↑` / `↓` | Défilement |
 | `→` / `Page Bas` | Chanson suivante |
 | `←` / `Page Haut` | Chanson précédente |
+
+### Pédalier Bluetooth
+
+Tout pédalier Bluetooth reconnu comme clavier HID est supporté nativement. Le filtre de touches fonctionne quelle que soit la fenêtre active (pas besoin que le prompteur soit au premier plan).
+
+| Geste | Action |
+|-------|--------|
+| Appui pédale bas (`↓`) | Défilement vers le bas |
+| 2 appuis consécutifs en bas de page | Chanson suivante |
+| Appui pédale haut (`↑`) | Défilement vers le haut |
+| 2 appuis consécutifs en haut de page | Chanson précédente |
+
+La pédale peut être **activée / désactivée** et sa **vitesse de défilement** réglée indépendamment dans la fenêtre de contrôle (section *Pédale BT*).
+
+Touches reconnues : `↓`, `Espace`, `F5` (bas) — `↑`, `F6` (haut). Si votre pédale envoie d'autres touches, modifier `_PEDAL_DOWN_KEYS` / `_PEDAL_UP_KEYS` dans `main.py`.
 
 ### Synchronisation iPad
 
