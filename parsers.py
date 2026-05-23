@@ -24,8 +24,23 @@ DEFAULT_SECTION_COLOR  = "#AAAAAA"
 
 # Accord valide : racine A-G, altération optionnelle, qualité, chiffres, basse optionnelle
 _CHORD_TOKEN_RE = re.compile(
-    r'^[A-G][#b]?(maj|Maj|min|m|M|dim|aug|sus|add)?[0-9]*(/[A-G][#b]?)?$'
+    r'^[A-G][#b]?(maj|Maj|min|m|M|dim|aug|sus|add)?[0-9]*(/[A-G][#b]?)?\*?$'
 )
+
+
+def extract_chord_positions(text: str) -> list:
+    """Retourne [(col, 'Am'), ...] pour chaque accord de la ligne."""
+    positions, i = [], 0
+    while i < len(text):
+        if text[i] != ' ':
+            j = i + 1
+            while j < len(text) and text[j] != ' ':
+                j += 1
+            positions.append((i, text[i:j]))
+            i = j
+        else:
+            i += 1
+    return positions
 
 
 def is_chord_line(text: str) -> bool:
@@ -52,6 +67,7 @@ class PromptLine:
     singer: Optional[str] = None  # prénom à afficher si balise sur la ligne
     is_chord: bool = False
     is_note: bool = False
+    chord_positions: list = field(default_factory=list)  # [(col, "Am"), ...] pour les lignes d'accords
 
 
 @dataclass
@@ -205,12 +221,14 @@ def _parse_lines(lines: list, file_path: str) -> Song:
             text = line
 
         is_note = text.strip().startswith('(')
+        is_chord = False if is_note else is_chord_line(text)
         current.lines.append(PromptLine(
             text=text,
             color=line_color,
             singer=line_singer,
-            is_chord=False if is_note else is_chord_line(text),
+            is_chord=is_chord,
             is_note=is_note,
+            chord_positions=extract_chord_positions(text) if is_chord else [],
         ))
 
     flush()

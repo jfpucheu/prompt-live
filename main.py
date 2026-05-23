@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QSlider, QCheckBox,
 )
 from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAnimation, QEasingCurve, QPoint, QObject, QEvent
-from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent
+from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent, QFont, QFontMetrics
 
 import os as _os
 import sys as _sys
@@ -222,6 +222,11 @@ class PrompterWindow(QMainWindow):
         self._reload_timer.setInterval(150)
         self._reload_timer.timeout.connect(self._reload_current)
 
+        self._resize_timer = QTimer()
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.setInterval(250)
+        self._resize_timer.timeout.connect(self._redisplay)
+
         # Empêche la mise en veille écran pendant le show
         self._caffeinate = subprocess.Popen(["caffeinate", "-d"])
 
@@ -360,6 +365,26 @@ class PrompterWindow(QMainWindow):
         self._display(self.current_index)
         self.set_scroll_pos(pos)
 
+    def _chars_per_line(self, song: Song) -> int:
+        font_name = self._font_family.split(",")[0].strip("' ")
+        px = max(8, int(song.font_lyrics * self._zoom))
+        font = QFont(font_name)
+        font.setPixelSize(px)
+        char_w = QFontMetrics(font).horizontalAdvance('M')
+        if char_w <= 0:
+            return 0
+        vp_w = self.view.viewport().width()
+        return max(0, vp_w // char_w)
+
+    def _redisplay(self):
+        pos = self.view.verticalScrollBar().value()
+        self._display(self.current_index)
+        self.view.verticalScrollBar().setValue(pos)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._resize_timer.start()
+
     def _display(self, index: int):
         if not self.songs or index >= len(self.songs):
             return
@@ -368,7 +393,9 @@ class PrompterWindow(QMainWindow):
         self.title_label.setText(song.title.upper())
         self.counter_label.setText(f"{index + 1} / {len(self.songs)}")
         show_chords = song.show_chords if self._show_chords is None else self._show_chords
-        html = render_html(song, zoom=self._zoom, show_chords=show_chords, font_family=self._font_family)
+        cpl = self._chars_per_line(song)
+        html = render_html(song, zoom=self._zoom, show_chords=show_chords,
+                           font_family=self._font_family, chars_per_line=cpl)
         self.view.setHtml(html)
         self.view.verticalScrollBar().setValue(0)
         if self._on_display:

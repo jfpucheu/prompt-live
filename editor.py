@@ -12,10 +12,11 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
-    QColor, QFont, QTextCharFormat, QKeySequence, QShortcut,
+    QColor, QFont, QFontMetrics, QTextCharFormat, QKeySequence, QShortcut,
     QTextCursor, QTextBlockUserData, QTextBlockFormat,
 )
 from parsers import parse_prompt_text
+from renderer import _wrap_splits, _rebuild_chord_text
 
 
 # ── Utilitaires ───────────────────────────────────────────────────────────────
@@ -46,12 +47,15 @@ def _extract_header(content: str) -> str:
 # ── Métadonnées par bloc ──────────────────────────────────────────────────────
 
 class _BD(QTextBlockUserData):
-    def __init__(self, tag='', is_section=False, is_chord=False, is_note=False):
+    def __init__(self, tag='', is_section=False, is_chord=False, is_note=False,
+                 is_split=False, full_text=''):
         super().__init__()
         self.tag        = tag
         self.is_section = is_section
         self.is_chord   = is_chord
         self.is_note    = is_note
+        self.is_split   = is_split    # True = bloc de continuation (display only)
+        self.full_text  = full_text   # texte original complet sur le 1er bloc d'une paire scindée
 
 
 # ── Bouton couleur ────────────────────────────────────────────────────────────
@@ -95,6 +99,7 @@ class _SongEdit(QTextEdit):
         super().__init__()
         self._lyrics_size: float = 28.0
         self._font_family: str = "Courier New"
+        self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -387,9 +392,17 @@ class EditorWindow(QMainWindow):
             QScrollBar:vertical { background:#111; width:6px; }
             QScrollBar::handle:vertical { background:#333; border-radius:3px; }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }
+            QScrollBar:horizontal { background:#111; height:6px; }
+            QScrollBar::handle:horizontal { background:#333; border-radius:3px; }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width:0; }
         """)
         self._edit.textChanged.connect(self._on_changed)
         splitter.addWidget(self._edit)
+
+        self._rebuild_timer = QTimer()
+        self._rebuild_timer.setSingleShot(True)
+        self._rebuild_timer.setInterval(300)
+        self._rebuild_timer.timeout.connect(self._rebuild_splits)
 
         self._panel = _SettingsPanel()
         self._panel.chord_color_changed.connect(self._on_chord_color)
@@ -572,21 +585,60 @@ class EditorWindow(QMainWindow):
 
                 cursor.block().setUserData(_BD(tag=section.singer or "", is_section=True))
 
-            for line in section.lines:
-                if line.is_chord:
-                    self._ins(cursor, line.text,
-                              song.chord_color, song.font_chords,
-                              bd=_BD(is_chord=True), first=first)
-                elif line.is_note:
+            lines = section.lines
+            idx = 0
+            while idx < len(lines):
+                line = lines[idx]
+
+                if line.is_note:
                     self._ins(cursor, line.text, "#666666", song.font_lyrics,
                               italic=True, bd=_BD(is_note=True), first=first)
+                    first = False
+                    idx += 1
+                    continue
+
+                # Accord + parole longue → découpage synchronisé
+                if line.is_chord and idx + 1 < len(lines):
+                    nxt = lines[idx + 1]
+                    cpl = self._chars_per_line()
+                    if (cpl > 0 and not nxt.is_chord and not nxt.is_note
+                            and nxt.text.strip() and len(nxt.text) > cpl):
+                        color = nxt.color or section.color or "#ffffff"
+                        tag   = nxt.singer or ("" if nxt.color else (section.singer or ""))
+                        slices = _wrap_splits(nxt.text, cpl)
+                        for i, (s0, s1) in enumerate(slices):
+                            chord_chunk = _rebuild_chord_text(line.chord_positions, s0, s1)
+                            lyric_chunk = nxt.text[s0:s1]
+                            is_cont = (i > 0)
+                            # Bloc accord (seulement s'il y a des accords sur cette tranche)
+                            if chord_chunk:
+                                self._ins(cursor, chord_chunk, song.chord_color, song.font_chords,
+                                          bd=_BD(is_chord=True,
+                                                 is_split=is_cont,
+                                                 full_text=line.text if i == 0 else ''),
+                                          first=first)
+                                first = False
+                            # Bloc parole
+                            self._ins(cursor, lyric_chunk, color, song.font_lyrics,
+                                      bd=_BD(tag=tag,
+                                             is_split=is_cont,
+                                             full_text=nxt.text if i == 0 else ''),
+                                      first=first)
+                            first = False
+                        idx += 2
+                        continue
+
+                # Cas normal
+                if line.is_chord:
+                    self._ins(cursor, line.text, song.chord_color, song.font_chords,
+                              bd=_BD(is_chord=True), first=first)
                 else:
                     color = line.color or section.color or "#ffffff"
-                    # Attribue le tag du chanteur qui contrôle la couleur de cette ligne
                     effective_tag = line.singer or ("" if line.color else (section.singer or ""))
                     self._ins(cursor, line.text, color, song.font_lyrics,
                               bd=_BD(tag=effective_tag), first=first)
                 first = False
+                idx += 1
 
         self._edit.blockSignals(False)
         self._edit.verticalScrollBar().setValue(0)
@@ -849,6 +901,9 @@ class EditorWindow(QMainWindow):
 
         self._iter_blocks(lambda b, bd: True, apply)
         self._mark_modified()
+        # La taille de police modifie chars_per_line → recalculer les découpes
+        if kind == 'lyrics':
+            self._rebuild_timer.start()
 
     def _on_tag_color(self, name: str, color: str):
         if self._song:
@@ -943,21 +998,68 @@ class EditorWindow(QMainWindow):
                 lines.append(f"@{orig}: {s.tags[key]}")
         return '\n'.join(lines)
 
+    def _chars_per_line(self) -> int:
+        if not self._song:
+            return 0
+        px = max(8, self._song.font_lyrics)
+        font = QFont(self._font_family)
+        font.setPixelSize(px)
+        char_w = QFontMetrics(font).horizontalAdvance('M')
+        if char_w <= 0:
+            return 0
+        return max(0, self._edit.viewport().width() // char_w)
+
+    def _rebuild_splits(self):
+        """Re-découpe les blocs selon la largeur courante, sans perdre les éditions."""
+        if not self._song:
+            return
+        try:
+            header = self._build_header()
+            content = self._extract_content()
+            song = parse_prompt_text(header + "\n\n" + content, self._current_path)
+            self._song = song
+        except Exception:
+            return
+        cursor = self._edit.textCursor()
+        bn  = cursor.blockNumber()
+        pos = cursor.positionInBlock()
+        self._build_document(song)
+        doc = self._edit.document()
+        target = doc.findBlockByNumber(min(bn, doc.blockCount() - 1))
+        nc = QTextCursor(target)
+        nc.setPosition(target.position() + min(pos, max(0, target.length() - 1)))
+        self._edit.setTextCursor(nc)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._rebuild_timer.start()
+
     def _extract_content(self) -> str:
         lines = []
         block = self._edit.document().begin()
         while block.isValid():
             text = block.text()
             bd   = block.userData()
-            tag  = bd.tag if bd else ""
+
+            # Blocs de continuation : ignorés (leur contenu est dans full_text du 1er bloc)
+            if bd and bd.is_split:
+                block = block.next()
+                continue
+
+            tag    = bd.tag if bd else ""
             is_sec = (bd and bd.is_section) or bool(re.match(r'^\s*\[', text))
+
             if not text.strip():
                 lines.append(" ")
             elif is_sec:
-                clean = re.sub(r'\s*▸.*$', '', text).strip()  # retire ▸ Nom affiché
+                clean = re.sub(r'\s*▸.*$', '', text).strip()
                 lines.append(clean + (f"@{tag}" if tag else ""))
             else:
-                lines.append(text + (f" @{tag}" if tag else ""))
+                # Si ce bloc est le 1er d'une paire scindée, restaurer le texte complet
+                # (full_text = texte d'origine avant découpage)
+                full = bd.full_text if bd and bd.full_text else text
+                lines.append(full + (f" @{tag}" if tag else ""))
+
             block = block.next()
         return '\n'.join(lines)
 

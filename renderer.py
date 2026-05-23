@@ -2,6 +2,41 @@
 from parsers import Song
 
 
+def _rebuild_chord_text(positions: list, col_start: int, col_end: int) -> str:
+    """Reconstruit une ligne d'accords pour la plage [col_start, col_end)."""
+    chunk = [(p - col_start, n) for p, n in positions if col_start <= p < col_end]
+    if not chunk:
+        return ""
+    size = chunk[-1][0] + len(chunk[-1][1])
+    buf = [' '] * size
+    for cp, name in chunk:
+        for k, ch in enumerate(name):
+            if cp + k < size:
+                buf[cp + k] = ch
+    return ''.join(buf).rstrip()
+
+
+def _wrap_splits(text: str, cols: int) -> list:
+    """Découpe `text` en tranches de max `cols` caractères, en coupant sur les espaces."""
+    slices, start = [], 0
+    while start < len(text):
+        end = start + cols
+        if end >= len(text):
+            slices.append((start, len(text)))
+            break
+        # Cherche le dernier espace ≤ end
+        bp = end
+        for i in range(end, start, -1):
+            if text[i - 1] == ' ':
+                bp = i
+                break
+        if bp == start:   # aucun espace → coupe dur
+            bp = end
+        slices.append((start, bp))
+        start = bp
+    return slices
+
+
 def _chord_spans(text: str, esc, chord_color: str, fs_chords: int, fs_lyrics: int) -> str:
     """Accords à fs_chords, espaces à fs_lyrics → alignement parfait quelle que soit la taille."""
     out = []
@@ -26,7 +61,8 @@ def _chord_spans(text: str, esc, chord_color: str, fs_chords: int, fs_lyrics: in
 
 
 def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None,
-                font_family: str = "'Courier New',Courier,monospace") -> str:
+                font_family: str = "'Courier New',Courier,monospace",
+                chars_per_line: int = 0) -> str:
     fs_lyrics  = max(8, int(song.font_lyrics  * zoom))
     fs_chords  = max(8, int(song.font_chords  * zoom))
     fs_section = max(8, int(song.font_section * zoom))
@@ -64,13 +100,19 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
             )
             block_num += 1
 
-        for line in section.lines:
+        lines = section.lines
+        idx = 0
+        while idx < len(lines):
+            line = lines[idx]
+
             if line.is_chord and not _show_chords:
+                idx += 1
                 continue
 
             if not line.text.strip():
                 parts.append(f'<p style="{p_style}" data-block="{block_num}"><span>&nbsp;</span></p>')
                 block_num += 1
+                idx += 1
                 continue
 
             if line.is_note:
@@ -80,7 +122,32 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
                     f'{esc(line.text)}</span></p>'
                 )
                 block_num += 1
+                idx += 1
                 continue
+
+            # Accord suivi d'une parole longue → découpage synchronisé
+            if (line.is_chord and chars_per_line > 0
+                    and idx + 1 < len(lines)):
+                nxt = lines[idx + 1]
+                if (not nxt.is_chord and not nxt.is_note
+                        and nxt.text.strip()
+                        and len(nxt.text) > chars_per_line):
+                    for s_start, s_end in _wrap_splits(nxt.text, chars_per_line):
+                        chord_chunk = _rebuild_chord_text(line.chord_positions, s_start, s_end)
+                        if chord_chunk:
+                            inner = _chord_spans(chord_chunk, esc, song.chord_color, fs_chords, fs_lyrics)
+                            parts.append(f'<p style="{p_style}" data-type="chord" data-block="{block_num}">{inner}</p>')
+                            block_num += 1
+                        lyric_chunk = nxt.text[s_start:s_end]
+                        color = nxt.color or section.color or "#ffffff"
+                        parts.append(
+                            f'<p style="{p_style}" data-type="lyric" data-block="{block_num}">'
+                            f'<span style="color:{color};font-size:{fs_lyrics}px;'
+                            f'font-weight:bold;">{esc(lyric_chunk)}</span></p>'
+                        )
+                        block_num += 1
+                    idx += 2
+                    continue
 
             if line.is_chord:
                 inner = _chord_spans(line.text, esc, song.chord_color, fs_chords, fs_lyrics)
@@ -93,6 +160,7 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
                     f'font-weight:bold;">{esc(line.text)}</span></p>'
                 )
             block_num += 1
+            idx += 1
 
     parts.append("</div>")
     return "".join(parts)
