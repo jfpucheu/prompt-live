@@ -178,17 +178,43 @@ function renderSetlist(songs) {
 }
 
 // ── Wake Lock (empêche la mise en veille de l'écran) ─────────────────────
+// Méthode 1 : API native (fonctionne en HTTPS)
 let _wakeLock = null;
 async function requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
+  try { _wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
+}
+
+// Méthode 2 : flux vidéo depuis un canvas (fonctionne en HTTP, déclenché au
+// premier toucher car iOS exige un geste utilisateur pour jouer une vidéo)
+let _wakeVideo = null;
+function startVideoWakeLock() {
+  if (_wakeVideo) return;
   try {
-    _wakeLock = await navigator.wakeLock.request('screen');
+    const c = document.createElement('canvas');
+    c.width = 1; c.height = 1;
+    c.getContext('2d').fillRect(0, 0, 1, 1);
+    _wakeVideo = document.createElement('video');
+    _wakeVideo.srcObject = c.captureStream(1);
+    _wakeVideo.muted = true;
+    _wakeVideo.loop  = true;
+    _wakeVideo.setAttribute('playsinline', '');
+    _wakeVideo.style.cssText =
+      'position:fixed;top:-1px;left:-1px;width:1px;height:1px;opacity:.01;';
+    document.body.appendChild(_wakeVideo);
+    _wakeVideo.play().catch(() => {});
   } catch (_) {}
 }
+
 requestWakeLock();
-// Re-demande le lock quand on revient sur l'onglet (il se libère automatiquement sinon)
+document.addEventListener('touchstart', () => {
+  requestWakeLock();
+  startVideoWakeLock();
+}, { once: true, passive: true });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') requestWakeLock();
+  if (document.visibilityState !== 'visible') return;
+  requestWakeLock();
+  if (_wakeVideo && _wakeVideo.paused) _wakeVideo.play().catch(() => {});
 });
 
 // ── Interleaving accords / paroles ────────────────────────────────────────
@@ -416,14 +442,21 @@ class PromptWebServer:
     def _broadcast(self, data: str):
         msg = f"data: {data}\n\n".encode()
         with self._lock:
-            dead = []
             for q in self._clients:
                 try:
                     q.put_nowait(msg)
                 except queue.Full:
-                    dead.append(q)
-            for q in dead:
-                self._clients.remove(q)
+                    # Purge les anciens messages et envoie le nouveau
+                    # (on ne déconnecte jamais sur queue pleine)
+                    try:
+                        while True:
+                            q.get_nowait()
+                    except queue.Empty:
+                        pass
+                    try:
+                        q.put_nowait(msg)
+                    except queue.Full:
+                        pass
 
     def _initial_state(self) -> "str | None":
         """Retourne le message SSE à envoyer à un nouveau client selon l'état courant."""
@@ -465,24 +498,35 @@ class PromptWebServer:
                 self.send_header("Connection", "keep-alive")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
-                # Envoie l'état courant immédiatement au nouveau client
-                init = srv._initial_state()
-                if init:
-                    self.wfile.write(f"data: {init}\n\n".encode())
-                    self.wfile.flush()
-                q: queue.Queue = queue.Queue(maxsize=20)
+
+                # Enregistre le client ET récupère l'état initial sous le même verrou
+                # pour éviter de rater un broadcast entre les deux opérations
+                q: queue.Queue = queue.Queue(maxsize=50)
                 with srv._lock:
                     srv._clients.append(q)
+                    init = srv._initial_state()
+
+                # Envoie l'état courant au nouveau client
+                if init:
+                    try:
+                        self.wfile.write(f"retry: 2000\ndata: {init}\n\n".encode())
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        with srv._lock:
+                            if q in srv._clients:
+                                srv._clients.remove(q)
+                        return
+
                 try:
                     while True:
                         try:
-                            msg = q.get(timeout=25)
+                            msg = q.get(timeout=15)
                             if msg is None:  # sentinel d'arrêt
                                 break
                             self.wfile.write(msg)
                             self.wfile.flush()
                         except queue.Empty:
-                            # Keepalive pour éviter que Safari ferme la connexion
+                            # Keepalive : évite que Safari / routeur ferme la connexion
                             self.wfile.write(b": ping\n\n")
                             self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError, OSError):

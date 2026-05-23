@@ -5,6 +5,31 @@ Affiche paroles et accords depuis des fichiers PDF/DOCX numérotés.
 """
 import sys
 import subprocess
+
+_DEFAULT_FONT = "Menlo" if sys.platform == "darwin" else "Courier New"
+
+
+def _prevent_sleep():
+    """Empêche la mise en veille de l'écran. macOS → caffeinate, Windows → SetThreadExecutionState."""
+    if sys.platform == "win32":
+        import ctypes
+        ES_CONTINUOUS       = 0x80000000
+        ES_DISPLAY_REQUIRED = 0x00000002
+        ES_SYSTEM_REQUIRED  = 0x00000001
+        ctypes.windll.kernel32.SetThreadExecutionState(
+            ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED
+        )
+        return None
+    return subprocess.Popen(["caffeinate", "-d"])
+
+
+def _allow_sleep(handle):
+    """Annule _prevent_sleep()."""
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)  # ES_CONTINUOUS seul = reset
+    elif handle is not None:
+        handle.terminate()
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QLabel, QFileDialog, QFrame, QTextBrowser,
@@ -227,8 +252,6 @@ class PrompterWindow(QMainWindow):
         self._resize_timer.setInterval(250)
         self._resize_timer.timeout.connect(self._redisplay)
 
-        # Empêche la mise en veille écran pendant le show
-        self._caffeinate = subprocess.Popen(["caffeinate", "-d"])
 
         self.setWindowTitle("Prompt-Live")
         self.setStyleSheet("background-color: black;")
@@ -320,7 +343,6 @@ class PrompterWindow(QMainWindow):
     # ── Cycle de vie ──────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
-        self._caffeinate.terminate()
         super().closeEvent(event)
 
     # ── Zoom ──────────────────────────────────────────────────────────────────
@@ -443,6 +465,8 @@ class ControlWindow(QMainWindow):
         self._prompters: list[PrompterWindow] = []
         self._screen_btns: list[QPushButton] = []
         self._editor: EditorWindow | None = None
+        self._caffeinate = _prevent_sleep()
+
         self._web_scroll_timer = QTimer()
         self._web_scroll_timer.setSingleShot(True)
         self._web_scroll_timer.setInterval(80)
@@ -451,7 +475,7 @@ class ControlWindow(QMainWindow):
 
         settings = QSettings("Prompt-Live", "Prompt-Live")
         self._last_dir: str = settings.value("last_dir", "")
-        self._font_family: str = settings.value("font_family", "Menlo")
+        self._font_family: str = settings.value("font_family", _DEFAULT_FONT)
         self._scroll_speed: int = int(settings.value("scroll_speed", 3))
 
         self.setWindowTitle("Prompt-Live — Contrôle")
@@ -887,6 +911,7 @@ class ControlWindow(QMainWindow):
             p.close()
         self._prompters.clear()
         self._web_server.stop()
+        _allow_sleep(self._caffeinate)
         event.accept()
 
 
