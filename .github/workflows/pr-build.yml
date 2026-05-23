@@ -13,6 +13,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: self-hosted
+            arch: intel
+            python: python3.12
+            platform: macos
           - os: macos-14
             arch: silicon
             python: python3
@@ -28,7 +32,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python (GitHub-hosted only)
+        if: matrix.arch == 'silicon' || matrix.platform == 'windows'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -49,14 +54,14 @@ jobs:
         if: matrix.platform == 'macos'
         run: |
           cd dist
-          ditto -c -k --keepParent Prompt-Live.app "../Prompt-Live-apple-silicon.zip"
+          ditto -c -k --keepParent Prompt-Live.app "../Prompt-Live-apple-${{ matrix.arch }}.zip"
 
       - name: Upload artifact (macOS)
         if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: Prompt-Live-apple-silicon
-          path: Prompt-Live-apple-silicon.zip
+          name: Prompt-Live-apple-${{ matrix.arch }}
+          path: Prompt-Live-apple-${{ matrix.arch }}.zip
           retention-days: 7
 
       # Windows ────────────────────────────────────────────────────────────────
@@ -127,6 +132,7 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" &>/dev/null; then
             # Met à jour les assets de la release existante
             gh release upload "$TAG" \
+              Prompt-Live-apple-intel.zip \
               Prompt-Live-apple-silicon.zip \
               Prompt-Live-windows-x64.zip \
               --clobber \
@@ -138,6 +144,7 @@ jobs:
           else
             # Crée la release et le tag sur le commit de la PR
             gh release create "$TAG" \
+              Prompt-Live-apple-intel.zip \
               Prompt-Live-apple-silicon.zip \
               Prompt-Live-windows-x64.zip \
               --prerelease \
