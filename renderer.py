@@ -46,6 +46,7 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
     lh = int(fs_lyrics * 1.45)
     p_style = f'margin:0;line-height:{lh}px;font-size:{fs_lyrics}px;'
 
+    block_num = 0
     for section in song.sections:
         if section.label:
             label_color = song.section_color
@@ -57,37 +58,41 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
                     f'font-weight:bold;"> ▸ {esc(section.singer)}</span>'
                 )
             parts.append(
-                f'<p style="{p_style}white-space:normal;">'
+                f'<p style="{p_style}white-space:normal;" data-block="{block_num}">'
                 f'<span style="color:{label_color};font-size:{fs_section}px;'
                 f'font-weight:bold;">[{esc(section.label)}]</span>{singer_html}</p>'
             )
+            block_num += 1
 
         for line in section.lines:
             if line.is_chord and not _show_chords:
                 continue
 
             if not line.text.strip():
-                parts.append(f'<p style="{p_style}"><span>&nbsp;</span></p>')
+                parts.append(f'<p style="{p_style}" data-block="{block_num}"><span>&nbsp;</span></p>')
+                block_num += 1
                 continue
 
             if line.is_note:
                 parts.append(
-                    f'<p style="{p_style}">'
+                    f'<p style="{p_style}" data-block="{block_num}">'
                     f'<span style="color:#666666;font-style:italic;font-size:{fs_lyrics}px;">'
                     f'{esc(line.text)}</span></p>'
                 )
+                block_num += 1
                 continue
 
             if line.is_chord:
                 inner = _chord_spans(line.text, esc, song.chord_color, fs_chords, fs_lyrics)
-                parts.append(f'<p style="{p_style}">{inner}</p>')
+                parts.append(f'<p style="{p_style}" data-type="chord" data-block="{block_num}">{inner}</p>')
             else:
                 color = line.color or section.color or "#ffffff"
                 parts.append(
-                    f'<p style="{p_style}">'
+                    f'<p style="{p_style}" data-type="lyric" data-block="{block_num}">'
                     f'<span style="color:{color};font-size:{fs_lyrics}px;'
                     f'font-weight:bold;">{esc(line.text)}</span></p>'
                 )
+            block_num += 1
 
     parts.append("</div>")
     return "".join(parts)

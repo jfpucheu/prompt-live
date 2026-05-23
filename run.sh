@@ -1,3 +1,4 @@
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "$DIR/.venv/bin/python3" "$DIR/main.py" "$@"
+"$DIR/.venv/bin/python3" "$DIR/main.py" "$@" &
+disown

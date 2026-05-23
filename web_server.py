@@ -191,6 +191,151 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') requestWakeLock();
 });
 
+// ── Interleaving accords / paroles ────────────────────────────────────────
+
+// Coupe les enfants de `el` à `offset` caractères ; retourne un nouvel élément
+// (hors DOM) contenant la 2e moitié, modifie `el` en place pour la 1re moitié.
+function splitElementAtTextOffset(el, offset) {
+  const newEl = el.cloneNode(false);
+  let pos = 0;
+  for (const child of Array.from(el.childNodes)) {
+    const len = child.textContent.length;
+    if (pos >= offset) {
+      el.removeChild(child);
+      newEl.appendChild(child);
+    } else if (pos + len > offset) {
+      const splitAt = offset - pos;
+      const before = child.textContent.substring(0, splitAt);
+      const after  = child.textContent.substring(splitAt);
+      if (child.nodeType === Node.TEXT_NODE) {
+        child.textContent = before;
+        if (after) newEl.appendChild(document.createTextNode(after));
+      } else {
+        child.textContent = before;
+        const newChild = child.cloneNode(false);
+        newChild.textContent = after;
+        newEl.appendChild(newChild);
+      }
+    }
+    pos += len;
+  }
+  return newEl;
+}
+
+function rechunkWrappedLines() {
+  const divEl = document.querySelector('#content div');
+  if (!divEl) return;
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const kids = Array.from(divEl.children);
+    for (let i = 0; i < kids.length; i++) {
+      if (!kids[i].dataset || kids[i].dataset.type !== 'chord') continue;
+
+      let j = i;
+      while (j < kids.length && kids[j].dataset && kids[j].dataset.type === 'chord') j++;
+      if (j >= kids.length ||
+          !kids[j].dataset || kids[j].dataset.type !== 'lyric') {
+        i = j - 1;
+        continue;
+      }
+
+      const lyricEl = kids[j];
+      const lhPx = parseFloat(window.getComputedStyle(lyricEl).lineHeight) || 40;
+      const elH = lyricEl.getBoundingClientRect().height;
+      const numLines = Math.max(1, Math.round(elH / lhPx));
+
+      if (numLines >= 2) {
+        const chords = kids.slice(i, j);
+        const breaks = findWordLineBreaks(lyricEl, numLines - 1);
+        if (breaks.length > 0) {
+          doInterleave(chords, lyricEl, breaks);
+          changed = true;
+          break;
+        }
+      }
+      i = j;
+    }
+  }
+}
+
+function findWordLineBreaks(lyricEl, maxBreaks) {
+  const span = lyricEl.querySelector('span');
+  if (!span || !span.firstChild || span.firstChild.nodeType !== Node.TEXT_NODE) return [];
+  const textNode = span.firstChild;
+  const text = textNode.textContent;
+  const words = text.split(' ');
+  const breaks = [];
+  let charPos = 0;
+  let prevTop = null;
+
+  for (let wi = 0; wi < words.length && breaks.length < maxBreaks; wi++) {
+    if (!words[wi]) { charPos++; continue; }
+    const range = document.createRange();
+    range.setStart(textNode, charPos);
+    range.setEnd(textNode, charPos + words[wi].length);
+    const top = range.getBoundingClientRect().top;
+    if (prevTop !== null && top > prevTop + 1) breaks.push(charPos);
+    prevTop = top;
+    charPos += words[wi].length + 1;
+  }
+  return breaks;
+}
+
+function doInterleave(chords, lyricEl, breaks) {
+  const span = lyricEl.querySelector('span');
+  const textNode = span.firstChild;
+  const text = textNode.textContent;
+  const parent = lyricEl.parentNode;
+
+  // Découpe les paroles aux positions de saut de ligne
+  const parts = [];
+  let last = 0;
+  for (const bp of breaks) {
+    parts.push(text.substring(last, bp).trimEnd());
+    last = bp;
+  }
+  parts.push(text.substring(last).trimStart());
+
+  textNode.textContent = parts[0];
+
+  // Prépare les éléments d'accords pour chaque partie suivante.
+  // - Plusieurs éléments d'accords : on les utilise dans l'ordre.
+  // - Un seul élément d'accord : on le découpe aux mêmes positions de saut.
+  const extraChords = [];
+  if (chords.length > 1) {
+    for (let k = 1; k < chords.length; k++) extraChords.push(chords[k]);
+  } else if (chords.length === 1) {
+    let remainder = chords[0];
+    let prevBp = 0;
+    for (const bp of breaks) {
+      const splitAt = bp - prevBp;
+      if (splitAt > 0) {
+        const nextPart = splitElementAtTextOffset(remainder, splitAt);
+        extraChords.push(nextPart);
+        remainder = nextPart;
+      } else {
+        extraChords.push(null);
+      }
+      prevBp = bp;
+    }
+  }
+
+  let anchor = lyricEl;
+  for (let k = 1; k < parts.length; k++) {
+    const chordEl = k - 1 < extraChords.length ? extraChords[k - 1] : null;
+    if (chordEl) {
+      parent.insertBefore(chordEl, anchor.nextSibling);
+      anchor = chordEl;
+    }
+    const newLyric = lyricEl.cloneNode(true);
+    newLyric.querySelector('span').firstChild.textContent = parts[k];
+    parent.insertBefore(newLyric, anchor.nextSibling);
+    anchor = newLyric;
+  }
+}
+
 // ── SSE ───────────────────────────────────────────────────────────────────
 function connect() {
   const es = new EventSource('/events');
@@ -200,11 +345,11 @@ function connect() {
     if (d.type === 'song') {
       box.innerHTML = d.html;
       window.scrollTo(0, 0);
+      requestAnimationFrame(rechunkWrappedLines);
     } else if (d.type === 'setlist') {
       renderSetlist(d.songs);
     } else if (d.type === 'scroll_line') {
-      const paras = document.querySelectorAll('#content p');
-      const el = paras[d.index];
+      const el = document.querySelector('#content p[data-block="' + d.index + '"]');
       if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset);
     }
   };

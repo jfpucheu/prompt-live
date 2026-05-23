@@ -53,6 +53,7 @@ class _PedalFilter(QObject):
         self._scroll_px    = _SPEED_PX[3]
         self._bottom_count = 0  # appuis consécutifs en bas de page
         self._top_count    = 0  # appuis consécutifs en haut de page
+        self.debug_cb      = None  # optionnel : callback(key_name: str)
 
     def _at_bottom(self, view) -> bool:
         sb = view.verticalScrollBar()
@@ -62,12 +63,18 @@ class _PedalFilter(QObject):
         return view.verticalScrollBar().value() <= self.BOTTOM_MARGIN
 
     def eventFilter(self, _obj, event):
-        if not self.enabled:
-            return False
         if event.type() != QEvent.Type.KeyPress or event.isAutoRepeat():
             return False
 
         key = event.key()
+
+        if self.debug_cb:
+            key_name = QKeySequence(key).toString() or f"0x{key:04X}"
+            self.debug_cb(key_name)
+
+        if not self.enabled:
+            return False
+
         is_down = key in _PEDAL_DOWN_KEYS
         is_up   = key in _PEDAL_UP_KEYS
         if not (is_down or is_up):
@@ -619,9 +626,14 @@ class ControlWindow(QMainWindow):
         pedal_hint.setStyleSheet("font-size: 10px; color: #888;")
         layout.addWidget(pedal_hint)
 
+        self._pedal_debug_label = QLabel("Touche reçue : —")
+        self._pedal_debug_label.setStyleSheet("font-size: 10px; color: #f90;")
+        layout.addWidget(self._pedal_debug_label)
+
         self._pedal_filter = _PedalFilter(lambda: self._prompters)
         self._pedal_filter.enabled    = pedal_enabled
         self._pedal_filter._scroll_px = _SPEED_PX.get(pedal_speed, 160)
+        self._pedal_filter.debug_cb   = self._on_pedal_debug
         QApplication.instance().installEventFilter(self._pedal_filter)
 
         # Serveur web — démarre immédiatement, affiche l'URL
@@ -647,6 +659,12 @@ class ControlWindow(QMainWindow):
     def _on_pedal_speed_changed(self, value: int):
         self._pedal_filter._scroll_px = _SPEED_PX.get(value, 160)
         QSettings("Prompt-Live", "Prompt-Live").setValue("pedal_speed", value)
+
+    def _on_pedal_debug(self, key_name: str):
+        down = "✓" if key_name in {QKeySequence(k).toString() for k in _PEDAL_DOWN_KEYS} else ""
+        up   = "✓" if key_name in {QKeySequence(k).toString() for k in _PEDAL_UP_KEYS}   else ""
+        tag  = f"  ← pédale ↓" if down else (f"  ← pédale ↑" if up else "")
+        self._pedal_debug_label.setText(f"Touche reçue : {key_name}{tag}")
 
     # ── Police ────────────────────────────────────────────────────────────────
 
