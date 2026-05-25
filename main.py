@@ -33,7 +33,7 @@ def _allow_sleep(handle):
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QLabel, QFileDialog, QFrame, QTextBrowser,
-    QComboBox, QSlider, QCheckBox,
+    QComboBox, QSlider, QCheckBox, QSpinBox,
 )
 from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAnimation, QEasingCurve, QPoint, QObject, QEvent
 from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent, QFont, QFontMetrics
@@ -264,8 +264,13 @@ class PrompterWindow(QMainWindow):
         layout.setContentsMargins(50, 30, 50, 20)
         layout.setSpacing(6)
 
-        # En-tête : titre + compteur
+        # En-tête : horloge + titre + compteur
+        settings_r = QSettings("Prompt-Live", "Prompt-Live")
+        self._clock_enabled: bool = bool(settings_r.value("clock_enabled", False, type=bool))
+        self._clock_size: int = int(settings_r.value("clock_size", 20))
+
         header = QHBoxLayout()
+
         self.title_label = QLabel()
         self.title_label.setStyleSheet(
             "color: #666666; font-size: 15px; font-weight: bold;"
@@ -275,7 +280,19 @@ class PrompterWindow(QMainWindow):
         self.counter_label = QLabel()
         self.counter_label.setStyleSheet("color: #444444; font-size: 13px;")
         header.addWidget(self.counter_label)
+
+        self.clock_label = QLabel()
+        self._apply_clock_style()
+        self.clock_label.setVisible(self._clock_enabled)
+        header.addWidget(self.clock_label)
         layout.addLayout(header)
+
+        self._clock_timer = QTimer()
+        self._clock_timer.setInterval(1000)
+        self._clock_timer.timeout.connect(self._tick_clock)
+        if self._clock_enabled:
+            self._tick_clock()
+            self._clock_timer.start()
 
         # Séparateur
         sep = QFrame()
@@ -307,6 +324,36 @@ class PrompterWindow(QMainWindow):
         QShortcut(QKeySequence("A"),      self, self._toggle_chords)
 
         self._display(self.current_index)
+
+    # ── Horloge ───────────────────────────────────────────────────────────────
+
+    def _apply_clock_style(self):
+        font = QFont("Courier New")
+        font.setPixelSize(self._clock_size)
+        font.setBold(True)
+        w = QFontMetrics(font).horizontalAdvance("00:00:00") + 16
+        self.clock_label.setStyleSheet(
+            f"color: #ffff00; font-size: {self._clock_size}px;"
+            f" font-family: 'Courier New',monospace; font-weight: bold;"
+        )
+        self.clock_label.setFixedWidth(w)
+
+    def _tick_clock(self):
+        from datetime import datetime
+        self.clock_label.setText(datetime.now().strftime("%H:%M:%S"))
+
+    def set_clock_enabled(self, enabled: bool):
+        self._clock_enabled = enabled
+        self.clock_label.setVisible(enabled)
+        if enabled:
+            self._tick_clock()
+            self._clock_timer.start()
+        else:
+            self._clock_timer.stop()
+
+    def set_clock_size(self, size: int):
+        self._clock_size = size
+        self._apply_clock_style()
 
     # ── Navigation ────────────────────────────────────────────────────────────
 
@@ -477,6 +524,8 @@ class ControlWindow(QMainWindow):
         self._last_dir: str = settings.value("last_dir", "")
         self._font_family: str = settings.value("font_family", _DEFAULT_FONT)
         self._scroll_speed: int = int(settings.value("scroll_speed", 3))
+        self._clock_enabled: bool = bool(settings.value("clock_enabled", False, type=bool))
+        self._clock_size: int = int(settings.value("clock_size", 20))
 
         self.setWindowTitle("Prompt-Live — Contrôle")
         self.setMinimumSize(460, 580)
@@ -681,6 +730,28 @@ class ControlWindow(QMainWindow):
         self._pedal_debug_label.setStyleSheet("font-size: 10px; color: #f90;")
         layout.addWidget(self._pedal_debug_label)
 
+        # ── Horloge ───────────────────────────────────────────────────────────
+        sep4 = QFrame(); sep4.setFrameShape(QFrame.Shape.HLine)
+        layout.addWidget(sep4)
+
+        clock_row = QHBoxLayout()
+        self._clock_cb = QCheckBox("Horloge")
+        self._clock_cb.setChecked(self._clock_enabled)
+        self._clock_cb.toggled.connect(self._on_clock_toggled)
+        clock_row.addWidget(self._clock_cb)
+
+        clock_row.addSpacing(12)
+        clock_row.addWidget(QLabel("Taille :"))
+        self._clock_spin = QSpinBox()
+        self._clock_spin.setRange(8, 120)
+        self._clock_spin.setValue(self._clock_size)
+        self._clock_spin.setSuffix(" px")
+        self._clock_spin.setFixedWidth(72)
+        self._clock_spin.valueChanged.connect(self._on_clock_size)
+        clock_row.addWidget(self._clock_spin)
+        clock_row.addStretch()
+        layout.addLayout(clock_row)
+
         self._pedal_filter = _PedalFilter(lambda: self._prompters)
         self._pedal_filter.enabled    = pedal_enabled
         self._pedal_filter._scroll_px = _SPEED_PX.get(pedal_speed, 160)
@@ -716,6 +787,20 @@ class ControlWindow(QMainWindow):
         up   = "✓" if key_name in {QKeySequence(k).toString() for k in _PEDAL_UP_KEYS}   else ""
         tag  = f"  ← pédale ↓" if down else (f"  ← pédale ↑" if up else "")
         self._pedal_debug_label.setText(f"Touche reçue : {key_name}{tag}")
+
+    # ── Horloge ───────────────────────────────────────────────────────────────
+
+    def _on_clock_toggled(self, enabled: bool):
+        self._clock_enabled = enabled
+        QSettings("Prompt-Live", "Prompt-Live").setValue("clock_enabled", enabled)
+        for p in self._prompters:
+            p.set_clock_enabled(enabled)
+
+    def _on_clock_size(self, size: int):
+        self._clock_size = size
+        QSettings("Prompt-Live", "Prompt-Live").setValue("clock_size", size)
+        for p in self._prompters:
+            p.set_clock_size(size)
 
     # ── Police ────────────────────────────────────────────────────────────────
 
