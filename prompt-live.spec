@@ -1,4 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys as _sys
+
+_win = _sys.platform == 'win32'
 
 a = Analysis(
     ['main.py'],
@@ -35,6 +38,7 @@ exe = EXE(
     upx=False,
     console=False,
     disable_windowed_traceback=False,
+    icon='logo/prompt-live.ico' if _win else 'logo/prompt-live.icns',
 )
 
 coll = COLLECT(
@@ -46,14 +50,15 @@ coll = COLLECT(
     name='Prompt-Live',
 )
 
-app = BUNDLE(
-    coll,
-    name='Prompt-Live.app',
-    icon='logo/prompt-live.icns',
-    bundle_identifier='com.promptlive.app',
-    info_plist={
-        'NSHighResolutionCapable': True,
-        'CFBundleShortVersionString': '1.1.0',
-        'LSMinimumSystemVersion': '11.0',
-    },
-)
+if not _win:
+    app = BUNDLE(
+        coll,
+        name='Prompt-Live.app',
+        icon='logo/prompt-live.icns',
+        bundle_identifier='com.promptlive.app',
+        info_plist={
+            'NSHighResolutionCapable': True,
+            'CFBundleShortVersionString': '1.1.0',
+            'LSMinimumSystemVersion': '11.0',
+        },
+    )

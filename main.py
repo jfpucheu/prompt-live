@@ -5,13 +5,38 @@ Affiche paroles et accords depuis des fichiers PDF/DOCX numérotés.
 """
 import sys
 import subprocess
+
+_DEFAULT_FONT = "Menlo" if sys.platform == "darwin" else "Courier New"
+
+
+def _prevent_sleep():
+    """Empêche la mise en veille de l'écran. macOS → caffeinate, Windows → SetThreadExecutionState."""
+    if sys.platform == "win32":
+        import ctypes
+        ES_CONTINUOUS       = 0x80000000
+        ES_DISPLAY_REQUIRED = 0x00000002
+        ES_SYSTEM_REQUIRED  = 0x00000001
+        ctypes.windll.kernel32.SetThreadExecutionState(
+            ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED
+        )
+        return None
+    return subprocess.Popen(["caffeinate", "-d"])
+
+
+def _allow_sleep(handle):
+    """Annule _prevent_sleep()."""
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)  # ES_CONTINUOUS seul = reset
+    elif handle is not None:
+        handle.terminate()
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QLabel, QFileDialog, QFrame, QTextBrowser,
-    QComboBox, QSlider, QCheckBox,
+    QComboBox, QSlider, QCheckBox, QSpinBox,
 )
 from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAnimation, QEasingCurve, QPoint, QObject, QEvent
-from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent
+from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent, QFont, QFontMetrics
 
 import os as _os
 import sys as _sys
@@ -222,8 +247,11 @@ class PrompterWindow(QMainWindow):
         self._reload_timer.setInterval(150)
         self._reload_timer.timeout.connect(self._reload_current)
 
-        # Empêche la mise en veille écran pendant le show
-        self._caffeinate = subprocess.Popen(["caffeinate", "-d"])
+        self._resize_timer = QTimer()
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.setInterval(250)
+        self._resize_timer.timeout.connect(self._redisplay)
+
 
         self.setWindowTitle("Prompt-Live")
         self.setStyleSheet("background-color: black;")
@@ -236,8 +264,13 @@ class PrompterWindow(QMainWindow):
         layout.setContentsMargins(50, 30, 50, 20)
         layout.setSpacing(6)
 
-        # En-tête : titre + compteur
+        # En-tête : horloge + titre + compteur
+        settings_r = QSettings("Prompt-Live", "Prompt-Live")
+        self._clock_enabled: bool = bool(settings_r.value("clock_enabled", False, type=bool))
+        self._clock_size: int = int(settings_r.value("clock_size", 20))
+
         header = QHBoxLayout()
+
         self.title_label = QLabel()
         self.title_label.setStyleSheet(
             "color: #666666; font-size: 15px; font-weight: bold;"
@@ -247,7 +280,19 @@ class PrompterWindow(QMainWindow):
         self.counter_label = QLabel()
         self.counter_label.setStyleSheet("color: #444444; font-size: 13px;")
         header.addWidget(self.counter_label)
+
+        self.clock_label = QLabel()
+        self._apply_clock_style()
+        self.clock_label.setVisible(self._clock_enabled)
+        header.addWidget(self.clock_label)
         layout.addLayout(header)
+
+        self._clock_timer = QTimer()
+        self._clock_timer.setInterval(1000)
+        self._clock_timer.timeout.connect(self._tick_clock)
+        if self._clock_enabled:
+            self._tick_clock()
+            self._clock_timer.start()
 
         # Séparateur
         sep = QFrame()
@@ -279,6 +324,36 @@ class PrompterWindow(QMainWindow):
         QShortcut(QKeySequence("A"),      self, self._toggle_chords)
 
         self._display(self.current_index)
+
+    # ── Horloge ───────────────────────────────────────────────────────────────
+
+    def _apply_clock_style(self):
+        font = QFont("Courier New")
+        font.setPixelSize(self._clock_size)
+        font.setBold(True)
+        w = QFontMetrics(font).horizontalAdvance("00:00:00") + 16
+        self.clock_label.setStyleSheet(
+            f"color: #ffff00; font-size: {self._clock_size}px;"
+            f" font-family: 'Courier New',monospace; font-weight: bold;"
+        )
+        self.clock_label.setFixedWidth(w)
+
+    def _tick_clock(self):
+        from datetime import datetime
+        self.clock_label.setText(datetime.now().strftime("%H:%M:%S"))
+
+    def set_clock_enabled(self, enabled: bool):
+        self._clock_enabled = enabled
+        self.clock_label.setVisible(enabled)
+        if enabled:
+            self._tick_clock()
+            self._clock_timer.start()
+        else:
+            self._clock_timer.stop()
+
+    def set_clock_size(self, size: int):
+        self._clock_size = size
+        self._apply_clock_style()
 
     # ── Navigation ────────────────────────────────────────────────────────────
 
@@ -315,7 +390,6 @@ class PrompterWindow(QMainWindow):
     # ── Cycle de vie ──────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
-        self._caffeinate.terminate()
         super().closeEvent(event)
 
     # ── Zoom ──────────────────────────────────────────────────────────────────
@@ -360,6 +434,26 @@ class PrompterWindow(QMainWindow):
         self._display(self.current_index)
         self.set_scroll_pos(pos)
 
+    def _chars_per_line(self, song: Song) -> int:
+        font_name = self._font_family.split(",")[0].strip("' ")
+        px = max(8, int(song.font_lyrics * self._zoom))
+        font = QFont(font_name)
+        font.setPixelSize(px)
+        char_w = QFontMetrics(font).horizontalAdvance('M')
+        if char_w <= 0:
+            return 0
+        vp_w = self.view.viewport().width()
+        return max(0, vp_w // char_w)
+
+    def _redisplay(self):
+        pos = self.view.verticalScrollBar().value()
+        self._display(self.current_index)
+        self.view.verticalScrollBar().setValue(pos)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._resize_timer.start()
+
     def _display(self, index: int):
         if not self.songs or index >= len(self.songs):
             return
@@ -368,7 +462,9 @@ class PrompterWindow(QMainWindow):
         self.title_label.setText(song.title.upper())
         self.counter_label.setText(f"{index + 1} / {len(self.songs)}")
         show_chords = song.show_chords if self._show_chords is None else self._show_chords
-        html = render_html(song, zoom=self._zoom, show_chords=show_chords, font_family=self._font_family)
+        cpl = self._chars_per_line(song)
+        html = render_html(song, zoom=self._zoom, show_chords=show_chords,
+                           font_family=self._font_family, chars_per_line=cpl)
         self.view.setHtml(html)
         self.view.verticalScrollBar().setValue(0)
         if self._on_display:
@@ -416,6 +512,8 @@ class ControlWindow(QMainWindow):
         self._prompters: list[PrompterWindow] = []
         self._screen_btns: list[QPushButton] = []
         self._editor: EditorWindow | None = None
+        self._caffeinate = _prevent_sleep()
+
         self._web_scroll_timer = QTimer()
         self._web_scroll_timer.setSingleShot(True)
         self._web_scroll_timer.setInterval(80)
@@ -424,8 +522,10 @@ class ControlWindow(QMainWindow):
 
         settings = QSettings("Prompt-Live", "Prompt-Live")
         self._last_dir: str = settings.value("last_dir", "")
-        self._font_family: str = settings.value("font_family", "Menlo")
+        self._font_family: str = settings.value("font_family", _DEFAULT_FONT)
         self._scroll_speed: int = int(settings.value("scroll_speed", 3))
+        self._clock_enabled: bool = bool(settings.value("clock_enabled", False, type=bool))
+        self._clock_size: int = int(settings.value("clock_size", 20))
 
         self.setWindowTitle("Prompt-Live — Contrôle")
         self.setMinimumSize(460, 580)
@@ -630,6 +730,28 @@ class ControlWindow(QMainWindow):
         self._pedal_debug_label.setStyleSheet("font-size: 10px; color: #f90;")
         layout.addWidget(self._pedal_debug_label)
 
+        # ── Horloge ───────────────────────────────────────────────────────────
+        sep4 = QFrame(); sep4.setFrameShape(QFrame.Shape.HLine)
+        layout.addWidget(sep4)
+
+        clock_row = QHBoxLayout()
+        self._clock_cb = QCheckBox("Horloge")
+        self._clock_cb.setChecked(self._clock_enabled)
+        self._clock_cb.toggled.connect(self._on_clock_toggled)
+        clock_row.addWidget(self._clock_cb)
+
+        clock_row.addSpacing(12)
+        clock_row.addWidget(QLabel("Taille :"))
+        self._clock_spin = QSpinBox()
+        self._clock_spin.setRange(8, 120)
+        self._clock_spin.setValue(self._clock_size)
+        self._clock_spin.setSuffix(" px")
+        self._clock_spin.setFixedWidth(72)
+        self._clock_spin.valueChanged.connect(self._on_clock_size)
+        clock_row.addWidget(self._clock_spin)
+        clock_row.addStretch()
+        layout.addLayout(clock_row)
+
         self._pedal_filter = _PedalFilter(lambda: self._prompters)
         self._pedal_filter.enabled    = pedal_enabled
         self._pedal_filter._scroll_px = _SPEED_PX.get(pedal_speed, 160)
@@ -665,6 +787,20 @@ class ControlWindow(QMainWindow):
         up   = "✓" if key_name in {QKeySequence(k).toString() for k in _PEDAL_UP_KEYS}   else ""
         tag  = f"  ← pédale ↓" if down else (f"  ← pédale ↑" if up else "")
         self._pedal_debug_label.setText(f"Touche reçue : {key_name}{tag}")
+
+    # ── Horloge ───────────────────────────────────────────────────────────────
+
+    def _on_clock_toggled(self, enabled: bool):
+        self._clock_enabled = enabled
+        QSettings("Prompt-Live", "Prompt-Live").setValue("clock_enabled", enabled)
+        for p in self._prompters:
+            p.set_clock_enabled(enabled)
+
+    def _on_clock_size(self, size: int):
+        self._clock_size = size
+        QSettings("Prompt-Live", "Prompt-Live").setValue("clock_size", size)
+        for p in self._prompters:
+            p.set_clock_size(size)
 
     # ── Police ────────────────────────────────────────────────────────────────
 
@@ -860,6 +996,7 @@ class ControlWindow(QMainWindow):
             p.close()
         self._prompters.clear()
         self._web_server.stop()
+        _allow_sleep(self._caffeinate)
         event.accept()
 
 

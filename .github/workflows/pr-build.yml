@@ -1,0 +1,173 @@
+name: PR Build
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  # ── Build macOS + Windows ────────────────────────────────────────────────────
+  build:
+    if: github.event.action != 'closed'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: self-hosted
+            arch: intel
+            python: python3.12
+            platform: macos
+          - os: macos-14
+            arch: silicon
+            python: python3
+            platform: macos
+          - os: windows-latest
+            arch: windows-x64
+            python: python
+            platform: windows
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python (GitHub-hosted only)
+        if: matrix.arch == 'silicon' || matrix.platform == 'windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # macOS ──────────────────────────────────────────────────────────────────
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          ${{ matrix.python }} -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install pyinstaller
+
+      - name: Build app (macOS)
+        if: matrix.platform == 'macos'
+        run: .venv/bin/pyinstaller prompt-live.spec --clean --noconfirm
+
+      - name: Zip app (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          cd dist
+          ditto -c -k --keepParent Prompt-Live.app "../Prompt-Live-apple-${{ matrix.arch }}.zip"
+
+      - name: Upload artifact (macOS)
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prompt-Live-apple-${{ matrix.arch }}
+          path: Prompt-Live-apple-${{ matrix.arch }}.zip
+          retention-days: 7
+
+      # Windows ────────────────────────────────────────────────────────────────
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          ${{ matrix.python }} -m venv .venv
+          .venv\Scripts\pip install -r requirements.txt
+          .venv\Scripts\pip install pyinstaller pillow
+
+      - name: Generate ICO icon (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          .venv\Scripts\python -c "
+          from PIL import Image
+          img = Image.open('logo/prompt-live.icns')
+          img.save('logo/prompt-live.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+          "
+
+      - name: Build app (Windows)
+        if: matrix.platform == 'windows'
+        run: .venv\Scripts\pyinstaller prompt-live.spec --clean --noconfirm
+
+      - name: Zip app (Windows)
+        if: matrix.platform == 'windows'
+        run: Compress-Archive -Path dist\Prompt-Live -DestinationPath Prompt-Live-windows-x64.zip
+
+      - name: Upload artifact (Windows)
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prompt-Live-windows-x64
+          path: Prompt-Live-windows-x64.zip
+          retention-days: 7
+
+  # ── Pré-release temporaire ───────────────────────────────────────────────────
+  pre-release:
+    needs: build
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create or update pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.head_ref }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          TAG="pr-${PR_NUMBER}"
+          TITLE="PR #${PR_NUMBER} — ${PR_TITLE}"
+          NOTES="Build de test automatique
+
+          Branch : \`${PR_BRANCH}\`
+          Commit : ${PR_SHA}
+
+          > Cette release est supprimée automatiquement à la fermeture de la PR."
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" &>/dev/null; then
+            # Met à jour les assets de la release existante
+            gh release upload "$TAG" \
+              Prompt-Live-apple-intel.zip \
+              Prompt-Live-apple-silicon.zip \
+              Prompt-Live-windows-x64.zip \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            # Crée la release et le tag sur le commit de la PR
+            gh release create "$TAG" \
+              Prompt-Live-apple-intel.zip \
+              Prompt-Live-apple-silicon.zip \
+              Prompt-Live-windows-x64.zip \
+              --prerelease \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --target "$PR_SHA" \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+
+  # ── Nettoyage à la fermeture de la PR ────────────────────────────────────────
+  cleanup:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Delete pre-release and tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          TAG="pr-${PR_NUMBER}"
+          gh release delete "$TAG" --yes --cleanup-tag \
+            --repo "$GITHUB_REPOSITORY" \
+            || echo "Release $TAG introuvable, rien à supprimer."

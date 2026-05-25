@@ -14,9 +14,15 @@ jobs:
           - os: self-hosted
             arch: intel
             python: python3.12
+            platform: macos
           - os: macos-14
             arch: silicon
             python: python3
+            platform: macos
+          - os: windows-latest
+            arch: windows-x64
+            python: python
+            platform: windows
 
     runs-on: ${{ matrix.os }}
 
@@ -25,22 +31,27 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python (GitHub-hosted only)
-        if: matrix.arch == 'silicon'
+        if: matrix.arch == 'silicon' || matrix.platform == 'windows'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      # ── macOS ──────────────────────────────────────────────────────────────────
+
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macos'
         run: |
           ${{ matrix.python }} -m venv .venv
           .venv/bin/pip install -r requirements.txt
           .venv/bin/pip install pyinstaller
 
-      - name: Build app
+      - name: Build app (macOS)
+        if: matrix.platform == 'macos'
         run: .venv/bin/pyinstaller prompt-live.spec --clean --noconfirm
 
       - name: Check signing configuration
         id: signing
+        if: matrix.platform == 'macos'
         env:
           CERT: ${{ secrets.MACOS_CERTIFICATE }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -49,7 +60,7 @@ jobs:
           [ -n "$APPLE_ID" ] && echo "has_notary=true" >> $GITHUB_OUTPUT || echo "has_notary=false" >> $GITHUB_OUTPUT
 
       - name: Import signing certificate
-        if: steps.signing.outputs.has_cert == 'true'
+        if: matrix.platform == 'macos' && steps.signing.outputs.has_cert == 'true'
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
@@ -64,7 +75,7 @@ jobs:
           rm certificate.p12
 
       - name: Sign app
-        if: steps.signing.outputs.has_cert == 'true'
+        if: matrix.platform == 'macos' && steps.signing.outputs.has_cert == 'true'
         env:
           MACOS_IDENTITY: ${{ secrets.MACOS_IDENTITY }}
         run: |
@@ -74,7 +85,7 @@ jobs:
             dist/Prompt-Live.app
 
       - name: Notarize app
-        if: steps.signing.outputs.has_notary == 'true'
+        if: matrix.platform == 'macos' && steps.signing.outputs.has_notary == 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
@@ -89,16 +100,51 @@ jobs:
           xcrun stapler staple dist/Prompt-Live.app
           rm Prompt-Live-notarize.zip
 
-      - name: Zip app
+      - name: Zip app (macOS)
+        if: matrix.platform == 'macos'
         run: |
           cd dist
           ditto -c -k --keepParent Prompt-Live.app "../Prompt-Live-apple-${{ matrix.arch }}.zip"
 
-      - name: Upload artifact
+      - name: Upload artifact (macOS)
+        if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
           name: Prompt-Live-apple-${{ matrix.arch }}
           path: Prompt-Live-apple-${{ matrix.arch }}.zip
+
+      # ── Windows ────────────────────────────────────────────────────────────────
+
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          ${{ matrix.python }} -m venv .venv
+          .venv\Scripts\pip install -r requirements.txt
+          .venv\Scripts\pip install pyinstaller pillow
+
+      - name: Generate ICO icon (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          .venv\Scripts\python -c "
+          from PIL import Image
+          img = Image.open('logo/prompt-live.icns')
+          img.save('logo/prompt-live.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+          "
+
+      - name: Build app (Windows)
+        if: matrix.platform == 'windows'
+        run: .venv\Scripts\pyinstaller prompt-live.spec --clean --noconfirm
+
+      - name: Zip app (Windows)
+        if: matrix.platform == 'windows'
+        run: Compress-Archive -Path dist\Prompt-Live -DestinationPath Prompt-Live-windows-x64.zip
+
+      - name: Upload artifact (Windows)
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prompt-Live-windows-x64
+          path: Prompt-Live-windows-x64.zip
 
   release:
     needs: build
@@ -119,3 +165,4 @@ jobs:
           files: |
             Prompt-Live-apple-intel/Prompt-Live-apple-intel.zip
             Prompt-Live-apple-silicon/Prompt-Live-apple-silicon.zip
+            Prompt-Live-windows-x64/Prompt-Live-windows-x64.zip
