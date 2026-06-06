@@ -28,3 +28,6 @@ logo/*.iconset/
 
 # Logs
 *.log
+
+# Notes personnelles
+TODO.md

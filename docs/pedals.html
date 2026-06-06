@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Prompt-Live — Pédaliers compatibles</title>
+<meta name="description" content="Liste des pédaliers Bluetooth testés et compatibles avec Prompt-Live. AirTurn PED et tout pédalier HID envoyant des touches clavier."/>
+<style>
+  :root {
+    --bg:    #07070e; --bg2: #111128; --bg3: #1a1a3a;
+    --acc1:  #ff6a2f; --acc2: #ffb340;
+    --text:  #e8e8f2; --muted: rgba(232,232,242,0.5);
+    --line:  rgba(232,232,242,0.08); --line2: rgba(232,232,242,0.14);
+    --glow:  rgba(255,106,47,0.25); --radius: 12px;
+    --mono:  'Courier New', Courier, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 16px; line-height: 1.6; overflow-x: hidden;
+  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+  h1, h2, h3 { line-height: 1.2; }
+  a { color: var(--acc2); text-decoration: none; }
+  a:hover { color: var(--acc1); }
+  .gradient-text {
+    background: linear-gradient(90deg, var(--acc1), var(--acc2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  /* ─── Nav ─── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem; height: 60px;
+    background: rgba(7,7,14,0.85); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-weight: 700; font-size: 1rem; color: var(--text);
+  }
+  .nav-logo img { width: 30px; height: 30px; }
+  .nav-links { display: flex; gap: 2rem; align-items: center; }
+  .nav-links a { color: var(--muted); font-size: 0.9rem; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-links a.active { color: var(--acc2); }
+  .lang-switch {
+    display: flex; align-items: center; gap: 4px;
+    font-family: var(--mono); font-size: 0.78rem;
+    border: 1px solid var(--line2); border-radius: 20px; padding: 3px 10px; color: var(--muted);
+  }
+  .lang-switch a { font-size: 0.78rem; }
+  .lang-switch .active-lang { color: var(--acc2); font-weight: 700; }
+  @media (max-width: 600px) { .nav-links { display: none; } }
+
+  /* ─── Page header ─── */
+  .page-header {
+    padding: 120px 2rem 60px;
+    text-align: center;
+    border-bottom: 1px solid var(--line);
+  }
+  .page-header .section-label {
+    font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--acc1), var(--acc2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: 0.75rem;
+  }
+  .page-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 700; margin-bottom: 1rem; }
+  .page-header p { color: var(--muted); font-size: 1.05rem; max-width: 560px; margin: 0 auto; }
+
+  /* ─── Container ─── */
+  .container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
+  section { padding: 60px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: none; }
+
+  .section-title {
+    font-size: 1.3rem; font-weight: 700; margin-bottom: 0.4rem;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .section-desc { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+
+  /* ─── Pedal cards ─── */
+  .pedal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+  .pedal-card {
+    background: var(--bg2);
+    border: 1px solid var(--line2);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .pedal-card:hover {
+    border-color: rgba(255,179,64,0.35);
+    box-shadow: 0 8px 32px rgba(255,106,47,0.1);
+  }
+  .pedal-card.confirmed { border-color: rgba(95,255,180,0.3); }
+  .pedal-img {
+    width: 100%; background: #0d0d1f;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .pedal-img img { max-width: 200px; max-height: 160px; object-fit: contain; border-radius: 6px; }
+  .pedal-body { padding: 1.2rem 1.4rem; }
+  .pedal-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .pedal-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
+    padding: 3px 10px; border-radius: 20px; margin-bottom: 0.8rem;
+  }
+  .status-ok   { background: rgba(95,255,180,0.12); color: #5ffbb4; border: 1px solid rgba(95,255,180,0.25); }
+  .status-likely { background: rgba(255,179,64,0.1); color: var(--acc2); border: 1px solid rgba(255,179,64,0.2); }
+  .pedal-desc { color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
+  .pedal-keys {
+    margin-top: 0.8rem;
+    display: flex; flex-wrap: wrap; gap: 5px;
+  }
+  .key-badge {
+    font-family: var(--mono); font-size: 0.75rem;
+    background: var(--bg3); border: 1px solid var(--line2);
+    border-radius: 5px; padding: 2px 8px; color: var(--text);
+  }
+
+  /* ─── Keys table ─── */
+  .keys-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .keys-table th {
+    text-align: left; padding: 0.6rem 1rem;
+    font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--line2);
+  }
+  .keys-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  .keys-table tr:last-child td { border-bottom: none; }
+  .keys-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .key-pill {
+    display: inline-block;
+    font-family: var(--mono); font-size: 0.8rem;
+    background: var(--bg3); border: 1px solid var(--line2);
+    border-radius: 5px; padding: 2px 8px; margin: 2px;
+    color: var(--text);
+  }
+  .action-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.82rem; color: var(--acc2);
+  }
+
+  /* ─── Contribute box ─── */
+  .contribute-box {
+    background: var(--bg2);
+    border: 1px solid var(--line2);
+    border-left: 3px solid var(--acc1);
+    border-radius: var(--radius);
+    padding: 1.5rem 1.8rem;
+    display: flex; align-items: flex-start; gap: 1rem;
+  }
+  .contribute-icon { font-size: 1.8rem; flex-shrink: 0; }
+  .contribute-box h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+  .contribute-box p { color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
+
+  /* ─── Footer ─── */
+  footer {
+    border-top: 1px solid var(--line); padding: 2.5rem 2rem;
+    text-align: center; color: var(--muted); font-size: 0.83rem;
+  }
+  .footer-logo {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--mono); font-size: 0.9rem; color: var(--text); margin-bottom: 0.75rem;
+  }
+  .footer-logo img { width: 22px; height: 22px; }
+  footer a { color: var(--muted); }
+  footer a:hover { color: var(--acc2); }
+  .btn-donate {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+    background: linear-gradient(135deg, var(--acc1), var(--acc2));
+    color: #07070e !important; transition: opacity 0.15s, transform 0.15s;
+  }
+  .btn-donate:hover { opacity: 0.85; transform: translateY(-1px); color: #07070e !important; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <img src="prompt-live.svg" alt=""/>
+    prompt-live
+  </div>
+  <div class="nav-links">
+    <a href="index.html">Accueil</a>
+    <a href="index.html#features">Fonctions</a>
+    <a href="pedals.html" class="active">Pédaliers</a>
+    <a href="index.html#download">Télécharger</a>
+    <a href="https://github.com/jfpucheu/prompt-live">GitHub ↗</a>
+    <a href="https://www.paypal.com/donate/?business=KZSZMWGEN8Z6W&no_recurring=0&currency_code=EUR" target="_blank" rel="noopener" class="btn-donate">♥ Donner</a>
+    <div class="lang-switch">
+      <span class="active-lang">FR</span>
+      <span style="opacity:0.3">|</span>
+      <a href="pedals.en.html">EN</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-header">
+  <p class="section-label">Compatibilité</p>
+  <h1>Pédaliers <span class="gradient-text">Bluetooth</span></h1>
+  <p>Référence des pédaliers testés et compatibles avec Prompt-Live.</p>
+</div>
+
+<div class="container">
+
+  <!-- ─── Pédaliers testés ─── -->
+  <section>
+    <h2 class="section-title">✅ Testés &amp; confirmés</h2>
+    <p class="section-desc">Ces pédaliers ont été testés directement avec Prompt-Live sur macOS et Windows.</p>
+
+    <div class="pedal-grid">
+      <div class="pedal-card confirmed">
+        <div class="pedal-img">
+          <img src="airturnped.png" alt="AirTurn PED"/>
+        </div>
+        <div class="pedal-body">
+          <div class="pedal-name">AirTurn PED</div>
+          <span class="pedal-status status-ok">✓ Testé &amp; confirmé</span>
+          <p class="pedal-desc">Pédalier 2 pédales Bluetooth, reconnu comme clavier HID. Connexion directe sans driver. Compatible macOS et Windows.</p>
+          <div class="pedal-keys">
+            <span class="key-badge">↓ (pédale bas)</span>
+            <span class="key-badge">↑ (pédale haut)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Compatibles en théorie ─── -->
+  <section>
+    <h2 class="section-title">🔶 Probablement compatibles</h2>
+    <p class="section-desc">Tout pédalier Bluetooth reconnu comme clavier HID et envoyant l'une des touches ci-dessous devrait fonctionner sans configuration.</p>
+
+    <div class="pedal-grid">
+      <div class="pedal-card">
+        <div class="pedal-body" style="padding-top:1.4rem;">
+          <div class="pedal-name">AirTurn DUO / QUAD</div>
+          <span class="pedal-status status-likely">⚬ Non testé</span>
+          <p class="pedal-desc">Mêmes touches que le PED. Devrait fonctionner nativement.</p>
+        </div>
+      </div>
+      <div class="pedal-card">
+        <div class="pedal-body" style="padding-top:1.4rem;">
+          <div class="pedal-name">PageFlip Butterfly / Cicada</div>
+          <span class="pedal-status status-likely">⚬ Non testé</span>
+          <p class="pedal-desc">Pédaliers HID Bluetooth populaires chez les musiciens. Mode clavier standard.</p>
+        </div>
+      </div>
+      <div class="pedal-card">
+        <div class="pedal-body" style="padding-top:1.4rem;">
+          <div class="pedal-name">Donner / Moukey BT</div>
+          <span class="pedal-status status-likely">⚬ Non testé</span>
+          <p class="pedal-desc">Pédaliers génériques envoyant ↓ / ↑ en mode Bluetooth. Très répandus.</p>
+        </div>
+      </div>
+      <div class="pedal-card">
+        <div class="pedal-body" style="padding-top:1.4rem;">
+          <div class="pedal-name">Tout pédalier HID Bluetooth</div>
+          <span class="pedal-status status-likely">⚬ Générique</span>
+          <p class="pedal-desc">N'importe quel pédalier reconnu comme clavier Bluetooth et envoyant une des touches supportées.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Touches reconnues ─── -->
+  <section>
+    <h2 class="section-title">⌨️ Touches reconnues par Prompt-Live</h2>
+    <p class="section-desc">Prompt-Live écoute ces touches en intercepteur global — le prompteur n'a pas besoin d'être au premier plan.</p>
+
+    <table class="keys-table">
+      <thead>
+        <tr>
+          <th>Touches</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="key-pill">↓</span>
+            <span class="key-pill">Espace</span>
+            <span class="key-pill">F5</span>
+          </td>
+          <td><span class="action-chip">↓ Défilement vers le bas</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="key-pill">↑</span>
+            <span class="key-pill">F6</span>
+          </td>
+          <td><span class="action-chip">↑ Défilement vers le haut</span></td>
+        </tr>
+        <tr>
+          <td><span class="key-pill">↓</span> <span style="color:var(--muted);font-size:0.85rem;">en bas de page</span></td>
+          <td><span class="action-chip">→ Chanson suivante</span></td>
+        </tr>
+        <tr>
+          <td><span class="key-pill">↑</span> <span style="color:var(--muted);font-size:0.85rem;">en haut de page</span></td>
+          <td><span class="action-chip">← Chanson précédente</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:1.2rem; color:var(--muted); font-size:0.85rem;">
+      Si ton pédalier envoie d'autres touches (ex. <code style="font-family:var(--mono);font-size:0.82rem;background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">Page Bas</code>, <code style="font-family:var(--mono);font-size:0.82rem;background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">F1</code>…), il suffit d'ajouter la touche dans <code style="font-family:var(--mono);font-size:0.82rem;background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">_PEDAL_DOWN_KEYS</code> / <code style="font-family:var(--mono);font-size:0.82rem;background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">_PEDAL_UP_KEYS</code> dans <code style="font-family:var(--mono);font-size:0.82rem;background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">main.py</code>.
+      Le label <em>Touche reçue</em> dans la fenêtre de contrôle indique en temps réel quelle touche est envoyée par la pédale.
+    </p>
+  </section>
+
+  <!-- ─── Contribuer ─── -->
+  <section>
+    <div class="contribute-box">
+      <div class="contribute-icon">🧪</div>
+      <div>
+        <h3>Tu as testé un autre pédalier ?</h3>
+        <p>Ouvre une <a href="https://github.com/jfpucheu/prompt-live/issues" target="_blank" rel="noopener">issue GitHub</a> avec le modèle, les touches envoyées et le résultat — on l'ajoute à cette page.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="footer-logo">
+    <img src="prompt-live.svg" alt=""/>
+    prompt-live
+  </div>
+  <p>
+    <a href="index.html">Accueil</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/jfpucheu/prompt-live">GitHub</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/jfpucheu/prompt-live/releases">Releases</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/jfpucheu/prompt-live/blob/main/LICENSE">Licence MIT + Commons Clause</a>
+  </p>
+  <p style="margin-top:1.2rem;">
+    <a href="https://www.paypal.com/donate/?business=KZSZMWGEN8Z6W&no_recurring=0&currency_code=EUR" target="_blank" rel="noopener" class="btn-donate" style="font-size:0.85rem;padding:8px 20px;">♥ Soutenir le projet</a>
+  </p>
+</footer>
+
+</body>
+</html>

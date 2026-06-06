@@ -30,6 +30,85 @@ def _allow_sleep(handle):
         ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)  # ES_CONTINUOUS seul = reset
     elif handle is not None:
         handle.terminate()
+
+
+# ─── Internationalisation ─────────────────────────────────────────────────────
+
+_LANG = "fr"
+
+_TR = {
+    "fr": {
+        "ctrl_title":     "Prompt-Live — Contrôle",
+        "app_title":      "Prompt-Live  —  Prompteur musical",
+        "no_dir":         "Aucun répertoire sélectionné",
+        "browse":         "Choisir…",
+        "reload":         "↺  Recharger",
+        "edit_songs":     "✏  Éditer les chansons",
+        "songs_label":    "Chansons (double-clic pour lancer depuis cette chanson) :",
+        "font_label":     "Police :",
+        "scroll_label":   "Défilement :",
+        "slow":           "Lent",
+        "fast":           "Rapide",
+        "screens_label":  "Diffusion sur :",
+        "refresh_tip":    "Actualiser les écrans",
+        "web_label":      "iPad / web :",
+        "web_starting":   "démarrage…",
+        "port_error":     "Erreur port : ",
+        "launch":         "▶   Lancer le prompteur",
+        "stop":           "■   Arrêter le prompteur",
+        "pedal":          "Pédale BT",
+        "speed_label":    "Vitesse :",
+        "pedal_hint":     "↓ / Espace  défilement     ↓ en bas de page → chanson suivante",
+        "key_received":   "Touche reçue : ",
+        "pedal_down_tag": "  ← pédale ↓",
+        "pedal_up_tag":   "  ← pédale ↑",
+        "clock":          "Horloge",
+        "size_label":     "Taille :",
+        "screen_n":       "Écran {}",
+        "screen_tip":     "Clic gauche : sélectionner\nClic droit : identifier l'écran",
+        "choose_dir":     "Choisir le répertoire des chansons",
+        "error":          "Erreur : ",
+        "prompter_hint":  "← / clic gauche : chanson précédente   |   ↑↓ / molette : défilement   |   → / clic droit : chanson suivante",
+    },
+    "en": {
+        "ctrl_title":     "Prompt-Live — Control",
+        "app_title":      "Prompt-Live  —  Live Prompter",
+        "no_dir":         "No directory selected",
+        "browse":         "Browse…",
+        "reload":         "↺  Reload",
+        "edit_songs":     "✏  Edit songs",
+        "songs_label":    "Songs (double-click to start from this song):",
+        "font_label":     "Font:",
+        "scroll_label":   "Scroll:",
+        "slow":           "Slow",
+        "fast":           "Fast",
+        "screens_label":  "Display on:",
+        "refresh_tip":    "Refresh screens",
+        "web_label":      "iPad / web:",
+        "web_starting":   "starting…",
+        "port_error":     "Port error: ",
+        "launch":         "▶   Launch prompter",
+        "stop":           "■   Stop prompter",
+        "pedal":          "BT Pedal",
+        "speed_label":    "Speed:",
+        "pedal_hint":     "↓ / Space  scroll     ↓ at bottom → next song",
+        "key_received":   "Key received: ",
+        "pedal_down_tag": "  ← pedal ↓",
+        "pedal_up_tag":   "  ← pedal ↑",
+        "clock":          "Clock",
+        "size_label":     "Size:",
+        "screen_n":       "Screen {}",
+        "screen_tip":     "Left click: select\nRight click: identify screen",
+        "choose_dir":     "Choose songs directory",
+        "error":          "Error: ",
+        "prompter_hint":  "← / left click: previous song   |   ↑↓ / wheel: scroll   |   → / right click: next song",
+    },
+}
+
+def _t(key: str) -> str:
+    return _TR.get(_LANG, _TR["fr"]).get(key, key)
+
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QLabel, QFileDialog, QFrame, QTextBrowser,
@@ -310,9 +389,7 @@ class PrompterWindow(QMainWindow):
         layout.addWidget(self.view, 1)
 
         # Pied de page
-        hint = QLabel(
-            "← / clic gauche : chanson précédente   |   ↑↓ / molette : défilement   |   → / clic droit : chanson suivante"
-        )
+        hint = QLabel(_t("prompter_hint"))
         hint.setStyleSheet("color: #2a2a2a; font-size: 10px;")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(hint)
@@ -527,7 +604,10 @@ class ControlWindow(QMainWindow):
         self._clock_enabled: bool = bool(settings.value("clock_enabled", False, type=bool))
         self._clock_size: int = int(settings.value("clock_size", 20))
 
-        self.setWindowTitle("Prompt-Live — Contrôle")
+        global _LANG
+        _LANG = settings.value("lang", "fr")
+
+        self.setWindowTitle(_t("ctrl_title"))
         self.setMinimumSize(460, 580)
 
         root = QWidget()
@@ -536,38 +616,49 @@ class ControlWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        # Titre
-        lbl = QLabel("Prompt-Live  —  Prompteur musical")
-        lbl.setStyleSheet("font-size: 17px; font-weight: bold;")
-        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(lbl)
+        # Titre + sélecteur de langue
+        title_row = QHBoxLayout()
+        self._lbl_title = QLabel(_t("app_title"))
+        self._lbl_title.setStyleSheet("font-size: 17px; font-weight: bold;")
+        self._lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_row.addWidget(self._lbl_title, 1)
+        self._lang_btn = QPushButton()
+        self._lang_btn.setFixedWidth(52)
+        self._lang_btn.setFixedHeight(24)
+        self._lang_btn.setStyleSheet(
+            "font-size: 11px; font-weight: bold; border-radius: 4px; border: 1px solid #aaa;"
+        )
+        self._lang_btn.clicked.connect(self._toggle_lang)
+        self._update_lang_btn()
+        title_row.addWidget(self._lang_btn)
+        layout.addLayout(title_row)
 
         # Sélection du répertoire
         dir_row = QHBoxLayout()
-        self.dir_label = QLabel(self._last_dir or "Aucun répertoire sélectionné")
+        self.dir_label = QLabel(self._last_dir or _t("no_dir"))
         self.dir_label.setStyleSheet("color: #555; font-size: 11px;")
         self.dir_label.setWordWrap(True)
         dir_row.addWidget(self.dir_label, 1)
-        btn_dir = QPushButton("Choisir…")
-        btn_dir.setFixedWidth(80)
-        btn_dir.clicked.connect(self._choose_dir)
-        dir_row.addWidget(btn_dir)
+        self._btn_dir = QPushButton(_t("browse"))
+        self._btn_dir.setFixedWidth(80)
+        self._btn_dir.clicked.connect(self._choose_dir)
+        dir_row.addWidget(self._btn_dir)
         layout.addLayout(dir_row)
 
         # Boutons Recharger + Éditer
         reload_row = QHBoxLayout()
-        btn_reload = QPushButton("↺  Recharger")
-        btn_reload.clicked.connect(self._reload)
-        reload_row.addWidget(btn_reload)
-        btn_edit = QPushButton("✏  Éditer les chansons")
-        btn_edit.clicked.connect(self._open_editor)
-        reload_row.addWidget(btn_edit)
+        self._btn_reload = QPushButton(_t("reload"))
+        self._btn_reload.clicked.connect(self._reload)
+        reload_row.addWidget(self._btn_reload)
+        self._btn_edit = QPushButton(_t("edit_songs"))
+        self._btn_edit.clicked.connect(self._open_editor)
+        reload_row.addWidget(self._btn_edit)
         layout.addLayout(reload_row)
 
         # Liste des chansons
-        lbl2 = QLabel("Chansons (double-clic pour lancer depuis cette chanson) :")
-        lbl2.setStyleSheet("font-size: 11px; color: #666;")
-        layout.addWidget(lbl2)
+        self._lbl_songs = QLabel(_t("songs_label"))
+        self._lbl_songs.setStyleSheet("font-size: 11px; color: #666;")
+        layout.addWidget(self._lbl_songs)
 
         self.song_list = QListWidget()
         self.song_list.setStyleSheet("font-size: 13px;")
@@ -579,7 +670,8 @@ class ControlWindow(QMainWindow):
         layout.addWidget(sep0)
 
         font_row = QHBoxLayout()
-        font_row.addWidget(QLabel("Police :"))
+        self._lbl_font = QLabel(_t("font_label"))
+        font_row.addWidget(self._lbl_font)
         self._font_combo = QComboBox()
         for name in ["Courier New", "Menlo", "Monaco", "Andale Mono", "PT Mono"]:
             self._font_combo.addItem(name)
@@ -592,7 +684,8 @@ class ControlWindow(QMainWindow):
 
         # ── Vitesse de défilement ──────────────────────────────────────────────
         speed_row = QHBoxLayout()
-        speed_row.addWidget(QLabel("Défilement :"))
+        self._lbl_scroll = QLabel(_t("scroll_label"))
+        speed_row.addWidget(self._lbl_scroll)
         self._speed_slider = QSlider(Qt.Orientation.Horizontal)
         self._speed_slider.setRange(1, 5)
         self._speed_slider.setValue(self._scroll_speed)
@@ -600,10 +693,10 @@ class ControlWindow(QMainWindow):
         self._speed_slider.setTickInterval(1)
         self._speed_slider.valueChanged.connect(self._on_speed_changed)
         speed_row.addWidget(self._speed_slider, 1)
-        lbl_slow = QLabel("Lent"); lbl_slow.setStyleSheet("font-size:10px;color:#888;")
-        lbl_fast = QLabel("Rapide"); lbl_fast.setStyleSheet("font-size:10px;color:#888;")
-        speed_row.insertWidget(1, lbl_slow)
-        speed_row.addWidget(lbl_fast)
+        self._lbl_slow = QLabel(_t("slow")); self._lbl_slow.setStyleSheet("font-size:10px;color:#888;")
+        self._lbl_fast = QLabel(_t("fast")); self._lbl_fast.setStyleSheet("font-size:10px;color:#888;")
+        speed_row.insertWidget(1, self._lbl_slow)
+        speed_row.addWidget(self._lbl_fast)
         layout.addLayout(speed_row)
 
         # ── Sélection des écrans ───────────────────────────────────────────────
@@ -611,13 +704,14 @@ class ControlWindow(QMainWindow):
         layout.addWidget(sep)
 
         screen_header = QHBoxLayout()
-        screen_header.addWidget(QLabel("Diffusion sur :"))
-        btn_refresh = QPushButton("↺")
-        btn_refresh.setFixedWidth(30)
-        btn_refresh.setFixedHeight(22)
-        btn_refresh.setToolTip("Actualiser les écrans")
-        btn_refresh.clicked.connect(self._build_screen_buttons)
-        screen_header.addWidget(btn_refresh)
+        self._lbl_screens = QLabel(_t("screens_label"))
+        screen_header.addWidget(self._lbl_screens)
+        self._btn_refresh = QPushButton("↺")
+        self._btn_refresh.setFixedWidth(30)
+        self._btn_refresh.setFixedHeight(22)
+        self._btn_refresh.setToolTip(_t("refresh_tip"))
+        self._btn_refresh.clicked.connect(self._build_screen_buttons)
+        screen_header.addWidget(self._btn_refresh)
         screen_header.addStretch()
         layout.addLayout(screen_header)
 
@@ -631,10 +725,10 @@ class ControlWindow(QMainWindow):
         layout.addWidget(sep2)
 
         web_row = QHBoxLayout()
-        lbl_web = QLabel("iPad / web :")
-        lbl_web.setStyleSheet("font-size: 11px;")
-        web_row.addWidget(lbl_web)
-        self._url_label = QLabel("démarrage…")
+        self._lbl_web = QLabel(_t("web_label"))
+        self._lbl_web.setStyleSheet("font-size: 11px;")
+        web_row.addWidget(self._lbl_web)
+        self._url_label = QLabel(_t("web_starting"))
         self._url_label.setStyleSheet(
             "color: #1a6ee0; font-size: 12px; font-family: 'Menlo', monospace;"
         )
@@ -643,8 +737,8 @@ class ControlWindow(QMainWindow):
         web_row.addWidget(self._url_label, 1)
         layout.addLayout(web_row)
 
-        # Bouton Lancer
-        self.btn_launch = QPushButton("▶   Lancer le prompteur")
+        # Boutons Lancer / Arrêter
+        self.btn_launch = QPushButton(_t("launch"))
         self.btn_launch.setEnabled(False)
         self.btn_launch.setFixedHeight(44)
         self.btn_launch.setStyleSheet("""
@@ -665,7 +759,7 @@ class ControlWindow(QMainWindow):
         """)
         self.btn_launch.clicked.connect(lambda: self._launch(0))
 
-        self.btn_stop = QPushButton("■   Arrêter le prompteur")
+        self.btn_stop = QPushButton(_t("stop"))
         self.btn_stop.setEnabled(False)
         self.btn_stop.setFixedHeight(44)
         self.btn_stop.setStyleSheet("""
@@ -702,13 +796,14 @@ class ControlWindow(QMainWindow):
         pedal_speed   = int(settings.value("pedal_speed", 3))
 
         pedal_row = QHBoxLayout()
-        self._pedal_cb = QCheckBox("Pédale BT")
+        self._pedal_cb = QCheckBox(_t("pedal"))
         self._pedal_cb.setChecked(pedal_enabled)
         self._pedal_cb.toggled.connect(self._on_pedal_toggled)
         pedal_row.addWidget(self._pedal_cb)
 
         pedal_row.addSpacing(12)
-        pedal_row.addWidget(QLabel("Vitesse :"))
+        self._lbl_pedal_speed = QLabel(_t("speed_label"))
+        pedal_row.addWidget(self._lbl_pedal_speed)
         self._pedal_speed_slider = QSlider(Qt.Orientation.Horizontal)
         self._pedal_speed_slider.setRange(1, 5)
         self._pedal_speed_slider.setValue(pedal_speed)
@@ -716,17 +811,17 @@ class ControlWindow(QMainWindow):
         self._pedal_speed_slider.setTickInterval(1)
         self._pedal_speed_slider.valueChanged.connect(self._on_pedal_speed_changed)
         pedal_row.addWidget(self._pedal_speed_slider, 1)
-        lbl_ps = QLabel("Lent"); lbl_ps.setStyleSheet("font-size:10px;color:#888;")
-        lbl_pf = QLabel("Rapide"); lbl_pf.setStyleSheet("font-size:10px;color:#888;")
-        pedal_row.insertWidget(pedal_row.count() - 1, lbl_ps)
-        pedal_row.addWidget(lbl_pf)
+        self._lbl_pedal_slow = QLabel(_t("slow")); self._lbl_pedal_slow.setStyleSheet("font-size:10px;color:#888;")
+        self._lbl_pedal_fast = QLabel(_t("fast")); self._lbl_pedal_fast.setStyleSheet("font-size:10px;color:#888;")
+        pedal_row.insertWidget(pedal_row.count() - 1, self._lbl_pedal_slow)
+        pedal_row.addWidget(self._lbl_pedal_fast)
         layout.addLayout(pedal_row)
 
-        pedal_hint = QLabel("↓ / Espace  défilement     2× ↓ en bas de page → chanson suivante")
-        pedal_hint.setStyleSheet("font-size: 10px; color: #888;")
-        layout.addWidget(pedal_hint)
+        self._pedal_hint_label = QLabel(_t("pedal_hint"))
+        self._pedal_hint_label.setStyleSheet("font-size: 10px; color: #888;")
+        layout.addWidget(self._pedal_hint_label)
 
-        self._pedal_debug_label = QLabel("Touche reçue : —")
+        self._pedal_debug_label = QLabel(_t("key_received") + "—")
         self._pedal_debug_label.setStyleSheet("font-size: 10px; color: #f90;")
         layout.addWidget(self._pedal_debug_label)
 
@@ -735,13 +830,14 @@ class ControlWindow(QMainWindow):
         layout.addWidget(sep4)
 
         clock_row = QHBoxLayout()
-        self._clock_cb = QCheckBox("Horloge")
+        self._clock_cb = QCheckBox(_t("clock"))
         self._clock_cb.setChecked(self._clock_enabled)
         self._clock_cb.toggled.connect(self._on_clock_toggled)
         clock_row.addWidget(self._clock_cb)
 
         clock_row.addSpacing(12)
-        clock_row.addWidget(QLabel("Taille :"))
+        self._lbl_clock_size = QLabel(_t("size_label"))
+        clock_row.addWidget(self._lbl_clock_size)
         self._clock_spin = QSpinBox()
         self._clock_spin.setRange(8, 120)
         self._clock_spin.setValue(self._clock_size)
@@ -764,13 +860,54 @@ class ControlWindow(QMainWindow):
             url = self._web_server.start()
             self._url_label.setText(url)
         except OSError as e:
-            self._url_label.setText(f"Erreur port : {e.strerror}")
+            self._url_label.setText(_t("port_error") + e.strerror)
 
         # Écoute les branchements/débranchements d'écrans
         QApplication.instance().screenAdded.connect(lambda _: self._build_screen_buttons())
         QApplication.instance().screenRemoved.connect(lambda _: self._build_screen_buttons())
 
         QTimer.singleShot(0, self._ask_directory)
+
+    # ── Langue ────────────────────────────────────────────────────────────────
+
+    def _toggle_lang(self):
+        global _LANG
+        _LANG = "en" if _LANG == "fr" else "fr"
+        QSettings("Prompt-Live", "Prompt-Live").setValue("lang", _LANG)
+        self._retranslate_ui()
+        self._build_screen_buttons()
+
+    def _update_lang_btn(self):
+        other = "EN" if _LANG == "fr" else "FR"
+        self._lang_btn.setText(f"→ {other}")
+
+    def _retranslate_ui(self):
+        self.setWindowTitle(_t("ctrl_title"))
+        self._lbl_title.setText(_t("app_title"))
+        if not self._last_dir:
+            self.dir_label.setText(_t("no_dir"))
+        self._btn_dir.setText(_t("browse"))
+        self._btn_reload.setText(_t("reload"))
+        self._btn_edit.setText(_t("edit_songs"))
+        self._lbl_songs.setText(_t("songs_label"))
+        self._lbl_font.setText(_t("font_label"))
+        self._lbl_scroll.setText(_t("scroll_label"))
+        self._lbl_slow.setText(_t("slow"))
+        self._lbl_fast.setText(_t("fast"))
+        self._lbl_screens.setText(_t("screens_label"))
+        self._btn_refresh.setToolTip(_t("refresh_tip"))
+        self._lbl_web.setText(_t("web_label"))
+        self.btn_launch.setText(_t("launch"))
+        self.btn_stop.setText(_t("stop"))
+        self._pedal_cb.setText(_t("pedal"))
+        self._lbl_pedal_speed.setText(_t("speed_label"))
+        self._lbl_pedal_slow.setText(_t("slow"))
+        self._lbl_pedal_fast.setText(_t("fast"))
+        self._pedal_hint_label.setText(_t("pedal_hint"))
+        self._pedal_debug_label.setText(_t("key_received") + "—")
+        self._clock_cb.setText(_t("clock"))
+        self._lbl_clock_size.setText(_t("size_label"))
+        self._update_lang_btn()
 
     # ── Pédale ────────────────────────────────────────────────────────────────
 
@@ -785,8 +922,8 @@ class ControlWindow(QMainWindow):
     def _on_pedal_debug(self, key_name: str):
         down = "✓" if key_name in {QKeySequence(k).toString() for k in _PEDAL_DOWN_KEYS} else ""
         up   = "✓" if key_name in {QKeySequence(k).toString() for k in _PEDAL_UP_KEYS}   else ""
-        tag  = f"  ← pédale ↓" if down else (f"  ← pédale ↑" if up else "")
-        self._pedal_debug_label.setText(f"Touche reçue : {key_name}{tag}")
+        tag  = _t("pedal_down_tag") if down else (_t("pedal_up_tag") if up else "")
+        self._pedal_debug_label.setText(_t("key_received") + f"{key_name}{tag}")
 
     # ── Horloge ───────────────────────────────────────────────────────────────
 
@@ -837,7 +974,7 @@ class ControlWindow(QMainWindow):
         for i, screen in enumerate(screens):
             geo = screen.geometry()
             is_primary = screen == primary
-            label = f"{'★ ' if is_primary else ''}Écran {i + 1}\n{geo.width()}×{geo.height()}"
+            label = f"{'★ ' if is_primary else ''}{_t('screen_n').format(i + 1)}\n{geo.width()}×{geo.height()}"
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setChecked(len(screens) == 1 or not is_primary)
@@ -852,8 +989,8 @@ class ControlWindow(QMainWindow):
                 }
             """)
             # Clic droit → flash d'identification sur cet écran
-            flash_label = f"Écran {i + 1}"
-            btn.setToolTip("Clic gauche : sélectionner\nClic droit : identifier l'écran")
+            flash_label = _t("screen_n").format(i + 1)
+            btn.setToolTip(_t("screen_tip"))
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             btn.customContextMenuRequested.connect(
                 lambda _, s=screen, fl=flash_label: ScreenFlash(s, fl)
@@ -869,7 +1006,7 @@ class ControlWindow(QMainWindow):
 
     def _ask_directory(self):
         d = QFileDialog.getExistingDirectory(
-            self, "Choisir le répertoire des chansons", self._last_dir,
+            self, _t("choose_dir"), self._last_dir,
             QFileDialog.Option.DontUseNativeDialog,
         )
         if d:
@@ -879,7 +1016,7 @@ class ControlWindow(QMainWindow):
 
     def _choose_dir(self):
         d = QFileDialog.getExistingDirectory(
-            self, "Choisir le répertoire des chansons", self._last_dir,
+            self, _t("choose_dir"), self._last_dir,
             QFileDialog.Option.DontUseNativeDialog,
         )
         if d:
@@ -912,7 +1049,7 @@ class ControlWindow(QMainWindow):
         try:
             self.songs = load_songs(self._last_dir)
         except Exception as e:
-            self.song_list.addItem(f"Erreur : {e}")
+            self.song_list.addItem(_t("error") + str(e))
             self.btn_launch.setEnabled(False)
             return
 
