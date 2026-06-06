@@ -1,6 +1,7 @@
 """
 Serveur HTTP léger pour diffuser le prompteur sur un appareil distant (iPad…).
-Utilise Server-Sent Events (SSE) — aucune dépendance externe.
+Utilise Server-Sent Events (SSE).
+Annonce le nom prompt-live.local via mDNS (zeroconf) si la lib est disponible.
 """
 import json
 import queue
@@ -8,6 +9,12 @@ import socket
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+
+try:
+    from zeroconf import ServiceInfo, Zeroconf as _Zeroconf
+    _ZEROCONF_OK = True
+except ImportError:
+    _ZEROCONF_OK = False
 
 
 class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
@@ -54,7 +61,7 @@ body {
   min-height: 100dvh;
   background: #000; color: #fff;
   overflow-x: hidden;
-  padding: 24px 32px 84px;
+  padding: 24px 32px 80px;
 }
 #dot {
   position: fixed; top: 14px; right: 14px;
@@ -126,13 +133,17 @@ body {
 /* ── Barre de contrôle iPad ─────────────────────────────────────────────── */
 #controls {
   position: fixed; bottom: 0; left: 0; right: 0;
-  height: 64px;
-  display: flex; align-items: center; justify-content: space-around;
+  display: flex; flex-direction: column; align-items: stretch;
   background: rgba(0,0,0,.90);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid #1c1c1c;
   z-index: 200;
 }
+.ctrl-btn-row {
+  height: 64px;
+  display: flex; align-items: center; justify-content: space-around;
+}
+body.follower .ctrl-btn-row { display: none; }
 .cb {
   background: none; border: none; color: #777;
   font-size: 28px; padding: 8px 16px;
@@ -146,43 +157,115 @@ body {
 .cb:active { background: #2a2a2a; color: #fff; }
 #btn-auto { color: #444; }
 #btn-auto.on { color: #00cc66; }
-#tp-bar {
-  position: fixed; bottom: 68px; right: 12px;
-  display: flex; align-items: center; gap: 4px;
-  background: rgba(10,10,10,.85);
-  border: 1px solid #2a2a2a; border-radius: 20px;
-  padding: 5px 10px; z-index: 201;
+/* ── Sélection du mode ───────────────────────────────────────────────────── */
+#mode-overlay {
+  display: none; position: fixed; inset: 0;
+  background: #000; z-index: 400;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 28px;
+  font-family: -apple-system, 'Helvetica Neue', sans-serif;
 }
-.tp {
-  background: none; border: none; color: #666;
-  font-size: 15px; font-weight: bold;
-  padding: 3px 8px; cursor: pointer;
-  touch-action: manipulation;
+#mode-overlay.open { display: flex; }
+.mo-title {
+  color: #444; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+}
+.mo-cards {
+  display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+  padding: 0 24px;
+}
+.mo-card {
+  background: #0d0d0d; border: 1px solid #222; border-radius: 16px;
+  padding: 32px 28px; min-width: 140px; text-align: center;
+  cursor: pointer; touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  border-radius: 8px;
+  user-select: none; -webkit-user-select: none;
+  transition: border-color .15s, background .15s;
+}
+.mo-card:active { background: #1a1a1a; border-color: #555; }
+.mo-icon { font-size: 42px; line-height: 1; margin-bottom: 14px; }
+.mo-name { color: #fff; font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+.mo-desc { color: #555; font-size: 13px; line-height: 1.5; }
+.mo-hint { color: #222; font-size: 12px; text-align: center; padding: 0 32px; }
+body.follower { padding-bottom: 24px; }
+/* ── Overlay setlist ─────────────────────────────────────────────────────── */
+#list-overlay {
+  display: none; position: fixed; inset: 0;
+  background: #000; z-index: 300;
+  flex-direction: column; overflow: hidden;
+}
+#list-overlay.open { display: flex; }
+#list-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 24px 12px; border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+#list-head span {
+  color: #555; font-family: -apple-system, sans-serif;
+  font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+}
+#list-close {
+  background: none; border: none; color: #666;
+  font-size: 26px; line-height: 1; cursor: pointer; padding: 4px 10px;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+#list-close:active { color: #fff; }
+#list-items {
+  flex: 1; overflow-y: auto; list-style: none;
+  padding: 0 0 20px; -webkit-overflow-scrolling: touch;
+}
+.li-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 20px 24px; border-bottom: 1px solid #0f0f0f;
+  font-family: -apple-system, 'Helvetica Neue', sans-serif;
+  font-size: 22px; color: #888;
+  cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   user-select: none; -webkit-user-select: none;
 }
-.tp:active { color: #fff; background: #333; }
-#tp-val {
-  color: #ff9900; font-size: 12px; font-weight: bold;
-  min-width: 24px; text-align: center;
+.li-row:active { background: #111; color: #fff; }
+.li-row.cur { color: #fff; }
+.li-row.cur .li-n { color: #0c9; }
+.li-n {
+  color: #333; font-size: 13px; min-width: 30px;
+  text-align: right; flex-shrink: 0; font-family: monospace;
 }
 </style>
 </head>
 <body>
 <div id="dot"></div>
-<div id="content"><p class="wait">En attente…</p></div>
-<div id="controls">
-  <button class="cb" onclick="sendCmd({cmd:'prev'})">&#x2B05;</button>
-  <button class="cb" onclick="sendCmd({cmd:'scroll',d:'up'})">&#x25B2;</button>
-  <button class="cb" id="btn-auto" onclick="sendCmd({cmd:'autoscroll'})">&#x25B6;&#x25B6;</button>
-  <button class="cb" onclick="sendCmd({cmd:'scroll',d:'down'})">&#x25BC;</button>
-  <button class="cb" onclick="sendCmd({cmd:'next'})">&#x27A1;</button>
+<div id="content"><p class="wait" data-i18n="wait">En attente&#x2026;</p></div>
+<div id="mode-overlay">
+  <p class="mo-title">Prompt-Live</p>
+  <div class="mo-cards">
+    <div class="mo-card" onclick="setMode('follower')">
+      <div class="mo-icon">&#x1F441;&#xFE0F;</div>
+      <div class="mo-name" data-i18n="moFollower">Suiveur</div>
+      <div class="mo-desc" data-i18n="moFollDesc">Affichage synchronis&#233;<br>sans contr&#244;le</div>
+    </div>
+    <div class="mo-card" onclick="setMode('commands')">
+      <div class="mo-icon">&#x1F3A4;</div>
+      <div class="mo-name" data-i18n="moCommands">Commandes</div>
+      <div class="mo-desc" data-i18n="moCommDesc">Pilotage du<br>prompteur</div>
+    </div>
+  </div>
+  <p class="mo-hint" data-i18n="moHint">Appui long sur &#x25CF; pour changer de mode</p>
 </div>
-<div id="tp-bar">
-  <button class="tp" onclick="sendCmd({cmd:'transpose',delta:-1})">&#x266D;</button>
-  <span id="tp-val">0</span>
-  <button class="tp" onclick="sendCmd({cmd:'transpose',delta:1})">&#x266F;</button>
+<div id="list-overlay">
+  <div id="list-head">
+    <span>Setlist</span>
+    <button id="list-close" onclick="closeList()">&#x2715;</button>
+  </div>
+  <ol id="list-items"></ol>
+</div>
+<div id="controls">
+  <div id="ctrl-btn-row" class="ctrl-btn-row">
+    <button class="cb" onclick="sendCmd({cmd:'prev'})">&#x2B05;</button>
+    <button class="cb" onclick="sendCmd({cmd:'scroll',d:'up'})">&#x25B2;</button>
+    <button class="cb" id="btn-auto" onclick="sendCmd({cmd:'autoscroll'})">&#x25B6;&#x25B6;</button>
+    <button class="cb" onclick="sendCmd({cmd:'scroll',d:'down'})">&#x25BC;</button>
+    <button class="cb" onclick="sendCmd({cmd:'next'})">&#x27A1;</button>
+    <button class="cb" onclick="openList()">&#x2630;</button>
+  </div>
 </div>
 <div id="pwa-hint">
   Appuie sur <strong>&#x2191; Partager</strong> puis<br>
@@ -193,6 +276,51 @@ body {
 <script>
 const dot = document.getElementById('dot');
 const box = document.getElementById('content');
+
+// ── i18n ───────────────────────────────────────────────────────────────────
+const _en = (navigator.language || '').toLowerCase().startsWith('en');
+const _t = {
+  wait:       _en ? 'Waiting…'                        : 'En attente…',
+  noSongs:    _en ? 'No songs loaded'                      : 'Aucune chanson chargée',
+  moFollower: _en ? 'Follower'                             : 'Suiveur',
+  moFollDesc: _en ? 'Synchronized display<br>no control'   : 'Affichage synchronisé<br>sans contrôle',
+  moCommands: _en ? 'Commands'                             : 'Commandes',
+  moCommDesc: _en ? 'Prompter<br>control'                  : 'Pilotage du<br>prompteur',
+  moHint:     _en ? 'Long press ● to change mode'     : 'Appui long sur ● pour changer de mode',
+};
+document.querySelectorAll('[data-i18n]').forEach(el => {
+  const v = _t[el.dataset.i18n];
+  if (v !== undefined) el.innerHTML = v;
+});
+
+// ── Mode suiveur / commandes ───────────────────────────────────────────────
+function applyMode(mode) {
+  document.body.classList.toggle('follower', mode === 'follower');
+}
+
+function setMode(mode) {
+  localStorage.setItem('pl-mode', mode);
+  applyMode(mode);
+  document.getElementById('mode-overlay').classList.remove('open');
+}
+(function initMode() {
+  const saved = localStorage.getItem('pl-mode');
+  if (saved) { applyMode(saved); }
+  else { document.getElementById('mode-overlay').classList.add('open'); }
+})();
+
+// Appui long sur le point de connexion pour changer de mode
+let _modeTimer = null;
+dot.addEventListener('touchstart', () => {
+  _modeTimer = setTimeout(() => {
+    document.getElementById('mode-overlay').classList.add('open');
+  }, 800);
+}, { passive: true });
+['touchend', 'touchcancel'].forEach(ev =>
+  dot.addEventListener(ev, () => {
+    if (_modeTimer) { clearTimeout(_modeTimer); _modeTimer = null; }
+  }, { passive: true })
+);
 
 // ── Fullscreen ────────────────────────────────────────────────────────────
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -218,10 +346,18 @@ function dismissHint() {
   sessionStorage.setItem('pwa-hint-dismissed', '1');
 }
 
+// ── Scroll piloté par le serveur ───────────────────────────────────────────
+// Le serveur envoie scroll_line à 60 fps ; on positionne directement la page.
+// Les deltas sont de 10-20 px par frame et suivent la courbe du serveur —
+// aucune interpolation JS nécessaire.
+function scrollToTarget(y) {
+  window.scrollTo(0, y);
+}
+
 // ── Setlist ───────────────────────────────────────────────────────────────
 function renderSetlist(songs) {
   if (!songs.length) {
-    box.innerHTML = '<p class="wait">Aucune chanson chargée</p>';
+    box.innerHTML = '<p class="wait">' + _t.noSongs + '</p>';
     return;
   }
   let html = '<div class="setlist"><p class="setlist-title">Setlist</p><ol>';
@@ -418,6 +554,74 @@ function doInterleave(chords, lyricEl, breaks) {
   }
 }
 
+// ── Overlay setlist ────────────────────────────────────────────────────────
+let _titles = [];
+let _curIdx  = -1;
+
+function openList() {
+  _renderList();
+  document.getElementById('list-overlay').classList.add('open');
+}
+function closeList() {
+  document.getElementById('list-overlay').classList.remove('open');
+}
+function _renderList() {
+  const ol = document.getElementById('list-items');
+  ol.innerHTML = '';
+  _titles.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = 'li-row' + (i === _curIdx ? ' cur' : '');
+    const n = document.createElement('span');
+    n.className = 'li-n';
+    n.textContent = String(i + 1).padStart(2, '0');
+    li.appendChild(n);
+    li.appendChild(document.createTextNode(t));
+    li.addEventListener('click', () => { sendCmd({cmd:'goto',index:i}); closeList(); });
+    ol.appendChild(li);
+  });
+  setTimeout(() => {
+    const cur = ol.querySelector('.cur');
+    if (cur) cur.scrollIntoView({block:'center',behavior:'smooth'});
+  }, 50);
+}
+
+// ── Scroll tactile (mode commandes) ───────────────────────────────────────
+// Le scroll natif iOS reste actif (feedback 1:1 immédiat sur la tablette).
+// On relaie l'index du premier bloc visible (zoom-indépendant) ; on ignore
+// les scroll_line entrants du serveur pendant et juste après le toucher.
+let _userScrolling    = false;
+let _scrollDecayTimer = null;
+let _scrollRelayTimer = null;
+
+function _getTopBlockIdx() {
+  for (const el of document.querySelectorAll('#content p[data-block]')) {
+    if (el.getBoundingClientRect().bottom > 4) return parseInt(el.dataset.block);
+  }
+  return -1;
+}
+
+window.addEventListener('scroll', () => {
+  if (localStorage.getItem('pl-mode') !== 'commands' || !_userScrolling) return;
+  if (_scrollRelayTimer) return;
+  _scrollRelayTimer = setTimeout(() => {
+    _scrollRelayTimer = null;
+    const idx = _getTopBlockIdx();
+    if (idx >= 0) sendCmd({cmd: 'scroll_block', index: idx});
+  }, 33);
+}, {passive: true});
+
+box.addEventListener('touchstart', () => {
+  _userScrolling = true;
+  clearTimeout(_scrollDecayTimer);
+}, {passive: true});
+
+box.addEventListener('touchend', () => {
+  clearTimeout(_scrollDecayTimer);
+  // 800 ms : laisse le momentum scroll iOS se terminer avant de ré-accepter
+  // les mises à jour du serveur
+  _scrollDecayTimer = setTimeout(() => { _userScrolling = false; }, 800);
+}, {passive: true});
+
 // ── Commandes iPad ────────────────────────────────────────────────────────
 function sendCmd(data) {
   fetch('/cmd', {
@@ -433,10 +637,6 @@ function updateAutoBtn(active) {
   else         { btn.classList.remove('on'); btn.innerHTML = '&#x25B6;&#x25B6;'; }
 }
 
-function updateTranspose(val) {
-  document.getElementById('tp-val').textContent = (val > 0 ? '+' : '') + val;
-}
-
 // ── SSE ───────────────────────────────────────────────────────────────────
 function connect() {
   const es = new EventSource('/events');
@@ -448,14 +648,18 @@ function connect() {
       window.scrollTo(0, 0);
       requestAnimationFrame(rechunkWrappedLines);
     } else if (d.type === 'setlist') {
+      _titles = d.songs;
       renderSetlist(d.songs);
+    } else if (d.type === 'navigate') {
+      _curIdx = d.index;
+      if (d.titles && d.titles.length) _titles = d.titles;
     } else if (d.type === 'scroll_line') {
-      const el = document.querySelector('#content p[data-block="' + d.index + '"]');
-      if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset);
+      if (!_userScrolling) {
+        const el = document.querySelector('#content p[data-block="' + d.index + '"]');
+        if (el) scrollToTarget(el.getBoundingClientRect().top + window.pageYOffset);
+      }
     } else if (d.type === 'autoscroll') {
       updateAutoBtn(d.active);
-    } else if (d.type === 'transpose') {
-      updateTranspose(d.value);
     }
   };
   es.onerror = () => {
@@ -481,7 +685,11 @@ class PromptWebServer:
         self._server: HTTPServer | None = None
         self._last_html: str = ""           # contenu quand le prompteur est actif
         self._last_setlist: list[str] = []  # titres quand le prompteur est arrêté
+        self._titles: list[str] = []        # titres courants (pour overlay iPad)
+        self._current_index: int = -1       # index chanson courante
         self._command_queue: list = []      # commandes reçues depuis l'iPad
+        self._zeroconf: "_Zeroconf | None" = None
+        self._mdns_info = None
 
     # ── API publique ─────────────────────────────────────────────────────────
 
@@ -489,9 +697,46 @@ class PromptWebServer:
         """Démarre le serveur ; retourne l'URL locale (ex. http://192.168.1.5:8765)."""
         self._server = _ThreadingHTTPServer(("", self._port), self._make_handler())
         threading.Thread(target=self._server.serve_forever, daemon=True).start()
+        self._start_mdns()
         return f"http://{_local_ip()}:{self._port}"
 
+    def mdns_url(self) -> "str | None":
+        """Retourne l'URL mDNS si l'annonce .local est active, sinon None."""
+        if self._zeroconf and self._mdns_info:
+            return f"http://prompt-live.local:{self._port}"
+        return None
+
+    def _start_mdns(self):
+        if not _ZEROCONF_OK:
+            return
+        try:
+            ip = _local_ip()
+            self._zeroconf = _Zeroconf()
+            self._mdns_info = ServiceInfo(
+                "_http._tcp.local.",
+                "Prompt-Live._http._tcp.local.",
+                addresses=[socket.inet_aton(ip)],
+                port=self._port,
+                properties={"path": "/"},
+                server="prompt-live.local.",
+            )
+            self._zeroconf.register_service(self._mdns_info)
+        except Exception:
+            if self._zeroconf:
+                self._zeroconf.close()
+            self._zeroconf = None
+            self._mdns_info = None
+
     def stop(self):
+        if self._zeroconf:
+            try:
+                if self._mdns_info:
+                    self._zeroconf.unregister_service(self._mdns_info)
+                self._zeroconf.close()
+            except Exception:
+                pass
+            self._zeroconf = None
+            self._mdns_info = None
         if self._server:
             with self._lock:
                 for q in self._clients:
@@ -521,9 +766,16 @@ class PromptWebServer:
         """Synchronise l'état auto-scroll sur les clients web."""
         self._broadcast(json.dumps({"type": "autoscroll", "active": active}))
 
-    def push_transpose(self, value: int):
-        """Synchronise la valeur de transposition sur les clients web."""
-        self._broadcast(json.dumps({"type": "transpose", "value": value}))
+    def set_titles(self, titles: list[str]):
+        """Mémorise la liste des titres pour l'overlay iPad."""
+        self._titles = titles
+
+    def push_navigate(self, index: int):
+        """Synchronise l'index de la chanson courante sur les clients web."""
+        self._current_index = index
+        self._broadcast(json.dumps({
+            "type": "navigate", "index": index, "titles": self._titles
+        }))
 
     def poll_commands(self) -> list:
         """Retourne et vide la file des commandes reçues depuis l'iPad."""
@@ -553,13 +805,20 @@ class PromptWebServer:
                     except queue.Full:
                         pass
 
-    def _initial_state(self) -> "str | None":
-        """Retourne le message SSE à envoyer à un nouveau client selon l'état courant."""
+    def _initial_state(self) -> "list[str]":
+        """Retourne les messages SSE à envoyer à un nouveau client selon l'état courant."""
+        msgs = []
         if self._last_html:
-            return json.dumps({"type": "song", "html": self._last_html})
-        if self._last_setlist is not None:
-            return json.dumps({"type": "setlist", "songs": self._last_setlist})
-        return None
+            msgs.append(json.dumps({"type": "song", "html": self._last_html}))
+            if self._current_index >= 0:
+                msgs.append(json.dumps({
+                    "type": "navigate",
+                    "index": self._current_index,
+                    "titles": self._titles,
+                }))
+        elif self._last_setlist:
+            msgs.append(json.dumps({"type": "setlist", "songs": self._last_setlist}))
+        return msgs
 
     def _make_handler(self):
         srv = self
@@ -596,6 +855,17 @@ class PromptWebServer:
                     self.send_header("Content-Length", str(len(b)))
                     self.end_headers()
                     self.wfile.write(b)
+                elif self.path == "/setlist":
+                    b = json.dumps({
+                        "titles": srv._titles,
+                        "current": srv._current_index,
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(b)))
+                    self.end_headers()
+                    self.wfile.write(b)
                 elif self.path == "/events":
                     self._sse()
                 else:
@@ -620,7 +890,11 @@ class PromptWebServer:
                 # Envoie l'état courant au nouveau client
                 if init:
                     try:
-                        self.wfile.write(f"retry: 2000\ndata: {init}\n\n".encode())
+                        first = True
+                        for msg in init:
+                            prefix = "retry: 2000\n" if first else ""
+                            self.wfile.write(f"{prefix}data: {msg}\n\n".encode())
+                            first = False
                         self.wfile.flush()
                     except (BrokenPipeError, ConnectionResetError, OSError):
                         with srv._lock:

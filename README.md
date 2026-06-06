@@ -7,8 +7,10 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS-lightgrey?logo=apple"/>
+  <img src="https://img.shields.io/badge/platform-Windows-0078d4?logo=windows"/>
   <img src="https://img.shields.io/badge/python-3.12+-blue?logo=python"/>
   <img src="https://img.shields.io/badge/license-MIT%20%2B%20Commons%20Clause-orange"/>
+  <img src="https://github.com/jfpucheu/prompt-live/actions/workflows/pr-build.yml/badge.svg" alt="CI"/>
 </p>
 
 <p align="center">
@@ -27,7 +29,7 @@
 
 ## Présentation
 
-Prompt-Live est une application macOS pour afficher paroles et accords en temps réel sur scène. Elle est pensée pour les groupes avec plusieurs chanteurs : chaque interprète peut être coloré différemment, les accords sont affichés au-dessus des paroles, et tout défile en douceur depuis la table de régie.
+Prompt-Live est une application **macOS et Windows** pour afficher paroles et accords en temps réel sur scène. Elle est pensée pour les groupes avec plusieurs chanteurs : chaque interprète peut être coloré différemment, les accords sont affichés au-dessus des paroles, et tout défile en douceur depuis la table de régie.
 
 **Fonctionnalités principales**
 
@@ -46,6 +48,7 @@ Prompt-Live est une application macOS pour afficher paroles et accords en temps 
 
 ## Installation (développement)
 
+**macOS**
 ```bash
 git clone https://github.com/jfpucheu/prompt-live.git
 cd prompt-live
@@ -55,23 +58,39 @@ pip install -r requirements.txt
 ./run.sh
 ```
 
+**Windows**
+```powershell
+git clone https://github.com/jfpucheu/prompt-live.git
+cd prompt-live
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+```
+
 ---
 
 ## Télécharger l'application
 
-Rendez-vous sur la page [**Releases**](https://github.com/jfpucheu/prompt-live/releases) pour télécharger la dernière version compilée pour macOS :
+Rendez-vous sur la page [**Releases**](https://github.com/jfpucheu/prompt-live/releases) pour télécharger la dernière version compilée :
 
-| Version | Intel (x86_64) | Apple Silicon (M1/M2/M3) |
-|---------|---------------|--------------------------|
-| Dernière | `Prompt-Live-apple-intel.zip` | `Prompt-Live-apple-silicon.zip` |
+| Plateforme | Fichier |
+|-----------|---------|
+| macOS Intel (x86_64) | `Prompt-Live-apple-intel.zip` |
+| macOS Apple Silicon (M1/M2/M3) | `Prompt-Live-apple-silicon.zip` |
+| Windows 10/11 (x64) | `Prompt-Live-windows-x64.zip` |
 
-Dézipper et glisser `Prompt-Live.app` dans votre dossier Applications.
+**macOS** — Dézipper et glisser `Prompt-Live.app` dans votre dossier Applications.
 
 > **Sécurité macOS** : l'application n'est pas notarisée Apple. Au premier lancement, macOS peut bloquer silencieusement son démarrage. Ouvrir un Terminal et lancer :
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/Prompt-Live.app
 > ```
 > Puis lancer l'app normalement.
+
+**Windows** — Dézipper `Prompt-Live-windows-x64.zip` dans le dossier de votre choix et lancer `Prompt-Live.exe`.
+
+> **Sécurité Windows** : SmartScreen peut afficher un avertissement au premier lancement ("Windows a protégé votre ordinateur"). Cliquer sur **Informations complémentaires** puis **Exécuter quand même**.
 
 ---
 
@@ -188,6 +207,7 @@ L'adresse IP est affichée dans la fenêtre de contrôle. La tablette suit le d�
 
 ## Build & Release
 
+**macOS**
 ```bash
 # Générer l'icône (si modifiée)
 python logo/make_icns.py
@@ -197,7 +217,14 @@ python logo/make_icns.py
 # → dist/Prompt-Live.app
 ```
 
-La CI GitHub Actions produit automatiquement les binaires Intel et Apple Silicon lors d'un push de tag `v*` :
+**Windows**
+```powershell
+.venv\Scripts\pip install pyinstaller pillow
+.venv\Scripts\pyinstaller prompt-live.spec --clean --noconfirm
+# → dist\Prompt-Live\Prompt-Live.exe
+```
+
+La CI GitHub Actions exécute les tests puis produit automatiquement les binaires macOS (Intel + Apple Silicon) et Windows lors d'un push de tag `v*` :
 
 ```bash
 git tag v1.0.0
@@ -208,12 +235,15 @@ git push origin v1.0.0
 
 ## FAQ
 
-**L'app ne démarre pas (aucun message, aucune fenêtre)**
+**L'app ne démarre pas (aucun message, aucune fenêtre) — macOS**
 > macOS bloque silencieusement les apps téléchargées non notarisées. Ouvrir un Terminal et lancer :
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/Prompt-Live.app
 > ```
 > Puis relancer l'app normalement.
+
+**Windows SmartScreen bloque le lancement**
+> Cliquer sur **Informations complémentaires** dans la fenêtre d'avertissement, puis **Exécuter quand même**. Cette alerte apparaît uniquement au premier lancement sur les exécutables non signés.
 
 **macOS bloque l'ouverture de l'app ("développeur non identifié")**
 > Faire clic droit → **Ouvrir** sur `Prompt-Live.app`. Confirmer dans la boîte de dialogue. À faire une seule fois.

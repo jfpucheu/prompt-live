@@ -76,27 +76,29 @@ def _transpose_chord_text(positions: list, semitones: int) -> str:
 
 def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None,
                 font_family: str = "'Courier New',Courier,monospace",
-                chars_per_line: int = 0, transpose: int = 0) -> str:
+                chars_per_line: int = 0) -> str:
     fs_lyrics  = max(8, int(song.font_lyrics  * zoom))
     fs_chords  = max(8, int(song.font_chords  * zoom))
     fs_section = max(8, int(song.font_section * zoom))
     _show_chords = song.show_chords if show_chords is None else show_chords
+    transpose    = song.transpose
 
     def esc(t: str) -> str:
         return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     parts = [f'<div style="font-family:{font_family};white-space:pre-wrap;">']
 
+    block_num = 0
+
     if song.notes:
         parts.append(
-            f'<p style="white-space:normal;"><span style="color:#666666;font-style:italic;font-size:{fs_section}px;">'
+            f'<p style="white-space:normal;" data-block="{block_num}"><span style="color:#666666;font-style:italic;font-size:{fs_section}px;">'
             f'{esc(song.notes)}</span></p>'
         )
+        block_num += 1
 
     lh = int(fs_lyrics * 1.45)
     p_style = f'margin:0;line-height:{lh}px;font-size:{fs_lyrics}px;'
-
-    block_num = 0
     for section in song.sections:
         if section.label:
             label_color = song.section_color

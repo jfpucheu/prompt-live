@@ -15,8 +15,8 @@ from PyQt6.QtGui import (
     QColor, QFont, QFontMetrics, QTextCharFormat, QKeySequence, QShortcut,
     QTextCursor, QTextBlockUserData, QTextBlockFormat,
 )
-from parsers import parse_prompt_text
-from renderer import _wrap_splits, _rebuild_chord_text
+from parsers import parse_prompt_text, transpose_chord
+from renderer import _wrap_splits, _rebuild_chord_text, _transpose_chord_text
 
 
 # ── Utilitaires ───────────────────────────────────────────────────────────────
@@ -128,6 +128,7 @@ class _SettingsPanel(QScrollArea):
     tag_renamed           = pyqtSignal(str, str)  # (old, new)
     tag_deleted           = pyqtSignal(str)        # (name)
     show_chords_changed   = pyqtSignal(bool)
+    transpose_changed     = pyqtSignal(int)
     meta_changed          = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -148,6 +149,12 @@ class _SettingsPanel(QScrollArea):
         self._titre = QLineEdit()
         self._titre.textChanged.connect(self.meta_changed)
         self._add_row("Titre", self._titre)
+
+        self._sz_transpose = self._spinbox(-12, 12)
+        self._sz_transpose.setSuffix(" ½t")
+        self._sz_transpose.valueChanged.connect(self.transpose_changed)
+        self._sz_transpose.valueChanged.connect(lambda _: self.meta_changed.emit())
+        self._add_row("Transpo", self._sz_transpose)
 
         # ── Tailles ───────────────────────────────────────────────────────────
         self._vbox.addWidget(self._sep_label("TAILLES (px)"))
@@ -201,10 +208,11 @@ class _SettingsPanel(QScrollArea):
 
     def load(self, song):
         for w, sig, val in [
-            (self._titre,      'textChanged', song.title),
-            (self._sz_lyrics,  'valueChanged', song.font_lyrics),
-            (self._sz_chords,  'valueChanged', song.font_chords),
-            (self._sz_section, 'valueChanged', song.font_section),
+            (self._titre,        'textChanged', song.title),
+            (self._sz_transpose, 'valueChanged', song.transpose),
+            (self._sz_lyrics,    'valueChanged', song.font_lyrics),
+            (self._sz_chords,    'valueChanged', song.font_chords),
+            (self._sz_section,   'valueChanged', song.font_section),
         ]:
             w.blockSignals(True)
             (w.setText if isinstance(w, QLineEdit) else w.setValue)(val)
@@ -291,6 +299,7 @@ class _SettingsPanel(QScrollArea):
 
     def titre(self):       return self._titre.text().strip()
     def show_chords(self): return self._show_chords.isChecked()
+    def transpose(self):   return self._sz_transpose.value()
 
     # ── Helpers UI ────────────────────────────────────────────────────────────
 
@@ -418,6 +427,7 @@ class EditorWindow(QMainWindow):
         self._panel.tag_renamed.connect(self._on_tag_rename)
         self._panel.tag_deleted.connect(self._on_tag_delete)
         self._panel.show_chords_changed.connect(self._on_show_chords)
+        self._panel.transpose_changed.connect(self._on_transpose_changed)
         self._panel.meta_changed.connect(self._mark_modified)
         splitter.addWidget(self._panel)
         splitter.setStretchFactor(0, 1)
@@ -606,13 +616,15 @@ class EditorWindow(QMainWindow):
                         color = nxt.color or section.color or "#ffffff"
                         tag   = nxt.singer or ("" if nxt.color else (section.singer or ""))
                         slices = _wrap_splits(nxt.text, cpl)
+                        tp_pos = [(c, transpose_chord(n, song.transpose)) for c, n in line.chord_positions] if song.transpose else line.chord_positions
                         for i, (s0, s1) in enumerate(slices):
                             chord_chunk = _rebuild_chord_text(line.chord_positions, s0, s1)
                             lyric_chunk = nxt.text[s0:s1]
                             is_cont = (i > 0)
                             # Bloc accord (seulement s'il y a des accords sur cette tranche)
                             if chord_chunk:
-                                self._ins(cursor, chord_chunk, song.chord_color, song.font_chords,
+                                display_chunk = _rebuild_chord_text(tp_pos, s0, s1) if song.transpose else chord_chunk
+                                self._ins(cursor, display_chunk, song.chord_color, song.font_chords,
                                           bd=_BD(is_chord=True,
                                                  is_split=is_cont,
                                                  full_text=line.text if i == 0 else ''),
@@ -630,8 +642,10 @@ class EditorWindow(QMainWindow):
 
                 # Cas normal
                 if line.is_chord:
-                    self._ins(cursor, line.text, song.chord_color, song.font_chords,
-                              bd=_BD(is_chord=True), first=first)
+                    display_text = _transpose_chord_text(line.chord_positions, song.transpose) if song.transpose else line.text
+                    self._ins(cursor, display_text, song.chord_color, song.font_chords,
+                              bd=_BD(is_chord=True, full_text=line.text if song.transpose else ''),
+                              first=first)
                 else:
                     color = line.color or section.color or "#ffffff"
                     effective_tag = line.singer or ("" if line.color else (section.singer or ""))
@@ -641,6 +655,8 @@ class EditorWindow(QMainWindow):
                 idx += 1
 
         self._edit.blockSignals(False)
+        tc = QTextCursor(self._edit.document())
+        self._edit.setTextCursor(tc)
         self._edit.verticalScrollBar().setValue(0)
 
     def _ins(self, cursor, text, color, size, bold=False, italic=False, bd=None, first=False):
@@ -840,6 +856,11 @@ class EditorWindow(QMainWindow):
 
     # ── Réactions aux changements de paramètres ───────────────────────────────
 
+    def _on_transpose_changed(self, value: int):
+        if self._song:
+            self._song.transpose = value
+            self._rebuild_timer.start()
+
     def _on_show_chords(self, show: bool):
         if self._song:
             self._song.show_chords = show
@@ -983,6 +1004,8 @@ class EditorWindow(QMainWindow):
         s = self._song
         p = self._panel
         lines = [f"Titre: {p.titre() or s.title}"]
+        if p.transpose():
+            lines.append(f"Transposition: {p.transpose()}")
         lines += [
             f"TailleParoles: {s.font_lyrics}",
             f"TailleAccords: {s.font_chords}",
@@ -1029,6 +1052,7 @@ class EditorWindow(QMainWindow):
         nc = QTextCursor(target)
         nc.setPosition(target.position() + min(pos, max(0, target.length() - 1)))
         self._edit.setTextCursor(nc)
+        self._edit.ensureCursorVisible()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

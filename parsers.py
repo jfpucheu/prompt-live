@@ -95,6 +95,7 @@ class Song:
     chord_color:    str  = DEFAULT_CHORD_COLOR
     section_color:  str  = DEFAULT_SECTION_COLOR
     show_chords:    bool = True
+    transpose:      int  = 0
 
 
 # [Label]  ou  [Label]@Tag
@@ -129,6 +130,7 @@ def _parse_lines(lines: list, file_path: str) -> Song:
     chord_color   = DEFAULT_CHORD_COLOR
     section_color = DEFAULT_SECTION_COLOR
     show_chords   = True
+    transpose     = 0
 
     # ── En-tête ───────────────────────────────────────────────────────────────
     i = 0
@@ -165,6 +167,11 @@ def _parse_lines(lines: list, file_path: str) -> Song:
         elif sl.startswith("afficheraccords:"):
             val = stripped.split(":", 1)[1].strip().lower()
             show_chords = val not in ("non", "no", "false", "0")
+        elif sl.startswith("transposition:"):
+            try:
+                transpose = int(stripped.split(":", 1)[1].strip())
+            except ValueError:
+                pass
         elif sl.startswith("couleursection:"):
             section_color = resolve_color(stripped.split(":", 1)[1].strip())
         elif sl.startswith("couleuraccords:"):
@@ -251,6 +258,7 @@ def _parse_lines(lines: list, file_path: str) -> Song:
         chord_color=chord_color,
         section_color=section_color,
         show_chords=show_chords,
+        transpose=transpose,
     )
 
 

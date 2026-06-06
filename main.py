@@ -69,11 +69,9 @@ _TR = {
         "choose_dir":     "Choisir le répertoire des chansons",
         "error":          "Erreur : ",
         "autoscroll":     "Défilement auto",
-        "transpose":      "Transposition :",
-        "reset":          "↺",
         "tab_main":       "Accueil",
         "tab_params":     "Paramètres",
-        "prompter_hint":  "← préc   ↑↓ défilement   → suiv   S auto-scroll   T / ⇧T transposer",
+        "prompter_hint":  "← préc   ↑↓ défilement   → suiv   S auto-scroll",
     },
     "en": {
         "ctrl_title":     "Prompt-Live — Control",
@@ -107,11 +105,9 @@ _TR = {
         "choose_dir":     "Choose songs directory",
         "error":          "Error: ",
         "autoscroll":     "Auto-scroll",
-        "transpose":      "Transpose:",
-        "reset":          "↺",
         "tab_main":       "Main",
         "tab_params":     "Settings",
-        "prompter_hint":  "← prev   ↑↓ scroll   → next   S auto-scroll   T / ⇧T transpose",
+        "prompter_hint":  "← prev   ↑↓ scroll   → next   S auto-scroll",
     },
 }
 
@@ -303,6 +299,29 @@ class PrompterView(QTextBrowser):
         self._anim.setEndValue(end)
         self._anim.start()
 
+    def scroll_to(self, target: int):
+        """Anime vers une position absolue sans accumulation."""
+        sb = self.verticalScrollBar()
+        target = max(0, min(sb.maximum(), target))
+        if self._anim.state() == QPropertyAnimation.State.Running:
+            cur = int(self._anim.currentValue())
+        else:
+            cur = sb.value()
+        if abs(target - cur) < 3:
+            return
+        self._anim.stop()
+        self._anim.setStartValue(cur)
+        self._anim.setEndValue(target)
+        self._anim.start()
+
+    def scroll_to_block(self, block_number: int):
+        """Anime vers la position absolue du bloc N (iPad scroll_block — zoom-indépendant)."""
+        doc = self.document()
+        block = doc.findBlockByNumber(block_number)
+        if block.isValid():
+            rect = doc.documentLayout().blockBoundingRect(block)
+            self.scroll_to(int(rect.top()))
+
     def _on_value_changed(self, value: int):
         if self._emit_enabled and self._on_scroll:
             self._on_scroll(value)
@@ -371,7 +390,7 @@ class PrompterWindow(QMainWindow):
 
     def __init__(self, songs: list[Song], start_index: int = 0, on_navigate=None, on_scroll=None, on_display=None,
                  font_family: str = "'Courier New',Courier,monospace", scroll_speed: int = 3,
-                 transpose: int = 0, on_transpose=None, on_autoscroll=None):
+                 on_autoscroll=None):
         super().__init__()
         self.songs = songs
         self.current_index = start_index
@@ -380,11 +399,9 @@ class PrompterWindow(QMainWindow):
         self._on_navigate   = on_navigate
         self._on_scroll     = on_scroll
         self._on_display    = on_display
-        self._on_transpose  = on_transpose   # callable(value: int)
         self._on_autoscroll = on_autoscroll  # callable(active: bool)
         self._scroll_speed  = scroll_speed
         self._font_family   = font_family
-        self._transpose     = transpose
 
         self._watcher = QFileSystemWatcher()
         self._watcher.fileChanged.connect(self._on_file_changed)
@@ -422,13 +439,6 @@ class PrompterWindow(QMainWindow):
             "color: #666666; font-size: 15px; font-weight: bold;"
         )
         header.addWidget(self.title_label, 1)
-
-        self.transpose_label = QLabel()
-        self.transpose_label.setStyleSheet(
-            "color: #ff9900; font-size: 13px; font-weight: bold;"
-        )
-        self.transpose_label.setVisible(False)
-        header.addWidget(self.transpose_label)
 
         self.auto_label = QLabel("▶▶")
         self.auto_label.setStyleSheet("color: #00cc66; font-size: 13px;")
@@ -480,9 +490,6 @@ class PrompterWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+-"),  self, self._zoom_out)
         QShortcut(QKeySequence("A"),       self, self._toggle_chords)
         QShortcut(QKeySequence("S"),       self, self._toggle_auto_scroll)
-        QShortcut(QKeySequence("T"),       self, self._transpose_up)
-        QShortcut(QKeySequence("Shift+T"), self, self._transpose_down)
-        QShortcut(QKeySequence("Ctrl+T"),  self, self._transpose_reset)
 
         self._display(self.current_index)
 
@@ -585,29 +592,6 @@ class PrompterWindow(QMainWindow):
     def set_auto_scroll_speed(self, speed: int):
         self.view.set_auto_scroll_speed(speed)
 
-    # ── Transposition ─────────────────────────────────────────────────────────
-
-    def _transpose_up(self):
-        self.set_transpose(self._transpose + 1)
-
-    def _transpose_down(self):
-        self.set_transpose(self._transpose - 1)
-
-    def _transpose_reset(self):
-        self.set_transpose(0)
-
-    def set_transpose(self, value: int):
-        self._transpose = value
-        sign = "+" if value > 0 else ""
-        if value == 0:
-            self.transpose_label.setVisible(False)
-        else:
-            self.transpose_label.setText(f"♯{sign}{value}")
-            self.transpose_label.setVisible(True)
-        self._display(self.current_index)
-        if self._on_transpose:
-            self._on_transpose(value)
-
     # ── Affichage ─────────────────────────────────────────────────────────────
 
     def _watch(self, path: str):
@@ -663,8 +647,7 @@ class PrompterWindow(QMainWindow):
         show_chords = song.show_chords if self._show_chords is None else self._show_chords
         cpl = self._chars_per_line(song)
         html = render_html(song, zoom=self._zoom, show_chords=show_chords,
-                           font_family=self._font_family, chars_per_line=cpl,
-                           transpose=self._transpose)
+                           font_family=self._font_family, chars_per_line=cpl)
         self.view.setHtml(html)
         self.view.stop_auto_scroll()
         self.view.verticalScrollBar().setValue(0)
@@ -716,8 +699,7 @@ class ControlWindow(QMainWindow):
         self._caffeinate = _prevent_sleep()
 
         self._web_scroll_timer = QTimer()
-        self._web_scroll_timer.setSingleShot(True)
-        self._web_scroll_timer.setInterval(80)
+        self._web_scroll_timer.setInterval(16)   # 60 fps, répétitif
         self._web_scroll_source: "PrompterWindow | None" = None
         self._web_scroll_timer.timeout.connect(self._flush_web_scroll)
 
@@ -727,7 +709,6 @@ class ControlWindow(QMainWindow):
         self._scroll_speed: int = int(settings.value("scroll_speed", 3))
         self._clock_enabled: bool = bool(settings.value("clock_enabled", False, type=bool))
         self._clock_size: int = int(settings.value("clock_size", 20))
-        self._transpose: int = 0
         self._autoscroll_speed: int = 3
 
         global _LANG
@@ -912,33 +893,6 @@ class ControlWindow(QMainWindow):
         speed_row.addWidget(self._lbl_fast)
         lay_p.addLayout(speed_row)
 
-        sep_tp = QFrame(); sep_tp.setFrameShape(QFrame.Shape.HLine)
-        lay_p.addWidget(sep_tp)
-
-        tp_row = QHBoxLayout()
-        self._lbl_transpose = QLabel(_t("transpose"))
-        self._lbl_transpose.setStyleSheet("font-size: 11px;")
-        tp_row.addWidget(self._lbl_transpose)
-        self._btn_tp_down = QPushButton("▼")
-        self._btn_tp_down.setFixedWidth(28); self._btn_tp_down.setFixedHeight(22)
-        self._btn_tp_down.clicked.connect(self._transpose_down)
-        tp_row.addWidget(self._btn_tp_down)
-        self._lbl_tp_val = QLabel("0")
-        self._lbl_tp_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_tp_val.setFixedWidth(36)
-        self._lbl_tp_val.setStyleSheet("font-weight: bold; color: #888888;")
-        tp_row.addWidget(self._lbl_tp_val)
-        self._btn_tp_up = QPushButton("▲")
-        self._btn_tp_up.setFixedWidth(28); self._btn_tp_up.setFixedHeight(22)
-        self._btn_tp_up.clicked.connect(self._transpose_up)
-        tp_row.addWidget(self._btn_tp_up)
-        self._btn_tp_reset = QPushButton(_t("reset"))
-        self._btn_tp_reset.setFixedWidth(28); self._btn_tp_reset.setFixedHeight(22)
-        self._btn_tp_reset.clicked.connect(self._transpose_reset)
-        tp_row.addWidget(self._btn_tp_reset)
-        tp_row.addStretch()
-        lay_p.addLayout(tp_row)
-
         as_row = QHBoxLayout()
         self._autoscroll_cb = QCheckBox(_t("autoscroll"))
         self._autoscroll_cb.toggled.connect(self._on_autoscroll_toggled)
@@ -1023,7 +977,8 @@ class ControlWindow(QMainWindow):
         self._web_server = PromptWebServer()
         try:
             url = self._web_server.start()
-            self._url_label.setText(url)
+            mdns = self._web_server.mdns_url()
+            self._url_label.setText(f"{mdns}\n{url}" if mdns else url)
         except OSError as e:
             self._url_label.setText(_t("port_error") + e.strerror)
 
@@ -1076,8 +1031,6 @@ class ControlWindow(QMainWindow):
         self._pedal_debug_label.setText(_t("key_received") + "—")
         self._clock_cb.setText(_t("clock"))
         self._lbl_clock_size.setText(_t("size_label"))
-        self._lbl_transpose.setText(_t("transpose"))
-        self._btn_tp_reset.setText(_t("reset"))
         self._autoscroll_cb.setText(_t("autoscroll"))
         self._lbl_as_slow.setText(_t("slow"))
         self._lbl_as_fast.setText(_t("fast"))
@@ -1115,28 +1068,6 @@ class ControlWindow(QMainWindow):
         for p in self._prompters:
             p.set_clock_size(size)
 
-    # ── Transposition ─────────────────────────────────────────────────────────
-
-    def _transpose_up(self):
-        self._set_transpose(self._transpose + 1)
-
-    def _transpose_down(self):
-        self._set_transpose(self._transpose - 1)
-
-    def _transpose_reset(self):
-        self._set_transpose(0)
-
-    def _set_transpose(self, value: int):
-        self._transpose = value
-        sign = "+" if value > 0 else ""
-        self._lbl_tp_val.setText(f"{sign}{value}" if value != 0 else "0")
-        self._lbl_tp_val.setStyleSheet(
-            f"font-weight: bold; color: {'#ff9900' if value != 0 else '#888888'};"
-        )
-        for p in self._prompters:
-            p.set_transpose(value)
-        self._web_server.push_transpose(value)
-
     # ── Auto-scroll ───────────────────────────────────────────────────────────
 
     def _on_autoscroll_toggled(self, checked: bool):
@@ -1169,12 +1100,16 @@ class ControlWindow(QMainWindow):
             elif c == "scroll":
                 px = _SPEED_PX.get(self._scroll_speed, 160)
                 p.view._smooth_scroll(px if cmd.get("d") == "down" else -px)
+            elif c == "scroll_block":
+                p.view.scroll_to_block(int(cmd.get("index", 0)))
             elif c == "autoscroll":
                 active = p.view.toggle_auto_scroll()
                 self._autoscroll_cb.setChecked(active)
                 self._web_server.push_autoscroll(active)
-            elif c == "transpose":
-                self._set_transpose(self._transpose + int(cmd.get("delta", 0)))
+            elif c == "goto":
+                idx = int(cmd.get("index", 0))
+                if 0 <= idx < len(self.songs):
+                    self._on_navigate(idx)
 
     # ── Police ────────────────────────────────────────────────────────────────
 
@@ -1297,6 +1232,7 @@ class ControlWindow(QMainWindow):
         if self.songs:
             self.song_list.setCurrentRow(0)
 
+        self._web_server.set_titles([s.title for s in self.songs])
         self._web_server.push_setlist([s.title for s in self.songs])
 
         for p in self._prompters:
@@ -1310,12 +1246,17 @@ class ControlWindow(QMainWindow):
         for p in self._prompters:
             p.go_to(index)
         self.song_list.setCurrentRow(index)
+        self._web_server.push_navigate(index)
 
     def _flush_web_scroll(self):
         if self._web_scroll_source and not self._web_scroll_source.isHidden():
             cursor = self._web_scroll_source.view.cursorForPosition(QPoint(0, 1))
             self._web_server.push_scroll_line(cursor.block().blockNumber())
-        self._web_scroll_source = None
+            self._web_scroll_source = None
+        else:
+            # Plus de scroll actif : on arrête le timer
+            self._web_scroll_timer.stop()
+            self._web_scroll_source = None
 
     def _on_scroll(self, source: PrompterWindow, pos: int):
         for p in self._prompters:
@@ -1350,8 +1291,6 @@ class ControlWindow(QMainWindow):
                                on_display=self._web_server.push_song if i == 0 else None,
                                font_family=self._css_font(),
                                scroll_speed=self._scroll_speed,
-                               transpose=self._transpose,
-                               on_transpose=self._set_transpose if i == 0 else None,
                                on_autoscroll=self._on_autoscroll_state if i == 0 else None)
             p.view.set_auto_scroll_speed(self._autoscroll_speed)
             p.setGeometry(scr.geometry())

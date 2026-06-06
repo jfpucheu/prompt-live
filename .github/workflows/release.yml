@@ -6,7 +6,20 @@ on:
       - 'v*'
 
 jobs:
+  # ── Tests ────────────────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run tests
+        run: python test_suite.py
+
+  # ── Build ─────────────────────────────────────────────────────────────────────
   build:
+    needs: test
     strategy:
       fail-fast: false
       matrix:
