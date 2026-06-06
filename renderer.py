@@ -1,5 +1,5 @@
 """Génération HTML du prompteur depuis un objet Song."""
-from parsers import Song
+from parsers import Song, transpose_chord
 
 
 def _rebuild_chord_text(positions: list, col_start: int, col_end: int) -> str:
@@ -60,9 +60,23 @@ def _chord_spans(text: str, esc, chord_color: str, fs_chords: int, fs_lyrics: in
     return ''.join(out)
 
 
+def _transpose_chord_text(positions: list, semitones: int) -> str:
+    """Reconstruit une ligne d'accords en transposant les noms, en préservant les colonnes."""
+    if not positions:
+        return ""
+    tp = [(col, transpose_chord(name, semitones)) for col, name in positions]
+    size = max(col + len(name) for col, name in tp)
+    buf = [' '] * size
+    for col, name in tp:
+        for k, c in enumerate(name):
+            if col + k < size:
+                buf[col + k] = c
+    return ''.join(buf).rstrip()
+
+
 def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None,
                 font_family: str = "'Courier New',Courier,monospace",
-                chars_per_line: int = 0) -> str:
+                chars_per_line: int = 0, transpose: int = 0) -> str:
     fs_lyrics  = max(8, int(song.font_lyrics  * zoom))
     fs_chords  = max(8, int(song.font_chords  * zoom))
     fs_section = max(8, int(song.font_section * zoom))
@@ -132,8 +146,9 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
                 if (not nxt.is_chord and not nxt.is_note
                         and nxt.text.strip()
                         and len(nxt.text) > chars_per_line):
+                    tp_pos = [(c, transpose_chord(n, transpose)) for c, n in line.chord_positions] if transpose else line.chord_positions
                     for s_start, s_end in _wrap_splits(nxt.text, chars_per_line):
-                        chord_chunk = _rebuild_chord_text(line.chord_positions, s_start, s_end)
+                        chord_chunk = _rebuild_chord_text(tp_pos, s_start, s_end)
                         if chord_chunk:
                             inner = _chord_spans(chord_chunk, esc, song.chord_color, fs_chords, fs_lyrics)
                             parts.append(f'<p style="{p_style}" data-type="chord" data-block="{block_num}">{inner}</p>')
@@ -150,7 +165,8 @@ def render_html(song: Song, zoom: float = 1.0, show_chords: "bool | None" = None
                     continue
 
             if line.is_chord:
-                inner = _chord_spans(line.text, esc, song.chord_color, fs_chords, fs_lyrics)
+                chord_text = _transpose_chord_text(line.chord_positions, transpose) if transpose else line.text
+                inner = _chord_spans(chord_text, esc, song.chord_color, fs_chords, fs_lyrics)
                 parts.append(f'<p style="{p_style}" data-type="chord" data-block="{block_num}">{inner}</p>')
             else:
                 color = line.color or section.color or "#ffffff"

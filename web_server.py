@@ -54,7 +54,7 @@ body {
   min-height: 100dvh;
   background: #000; color: #fff;
   overflow-x: hidden;
-  padding: 24px 32px 60px;
+  padding: 24px 32px 84px;
 }
 #dot {
   position: fixed; top: 14px; right: 14px;
@@ -123,11 +123,67 @@ body {
   color: #555; font-size: 12px;
   cursor: pointer; padding: 2px 8px;
 }
+/* ── Barre de contrôle iPad ─────────────────────────────────────────────── */
+#controls {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 64px;
+  display: flex; align-items: center; justify-content: space-around;
+  background: rgba(0,0,0,.90);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid #1c1c1c;
+  z-index: 200;
+}
+.cb {
+  background: none; border: none; color: #777;
+  font-size: 28px; padding: 8px 16px;
+  cursor: pointer; border-radius: 10px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .1s, background .1s;
+  user-select: none; -webkit-user-select: none;
+  min-width: 56px; text-align: center;
+}
+.cb:active { background: #2a2a2a; color: #fff; }
+#btn-auto { color: #444; }
+#btn-auto.on { color: #00cc66; }
+#tp-bar {
+  position: fixed; bottom: 68px; right: 12px;
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(10,10,10,.85);
+  border: 1px solid #2a2a2a; border-radius: 20px;
+  padding: 5px 10px; z-index: 201;
+}
+.tp {
+  background: none; border: none; color: #666;
+  font-size: 15px; font-weight: bold;
+  padding: 3px 8px; cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 8px;
+  user-select: none; -webkit-user-select: none;
+}
+.tp:active { color: #fff; background: #333; }
+#tp-val {
+  color: #ff9900; font-size: 12px; font-weight: bold;
+  min-width: 24px; text-align: center;
+}
 </style>
 </head>
 <body>
 <div id="dot"></div>
 <div id="content"><p class="wait">En attente…</p></div>
+<div id="controls">
+  <button class="cb" onclick="sendCmd({cmd:'prev'})">&#x2B05;</button>
+  <button class="cb" onclick="sendCmd({cmd:'scroll',d:'up'})">&#x25B2;</button>
+  <button class="cb" id="btn-auto" onclick="sendCmd({cmd:'autoscroll'})">&#x25B6;&#x25B6;</button>
+  <button class="cb" onclick="sendCmd({cmd:'scroll',d:'down'})">&#x25BC;</button>
+  <button class="cb" onclick="sendCmd({cmd:'next'})">&#x27A1;</button>
+</div>
+<div id="tp-bar">
+  <button class="tp" onclick="sendCmd({cmd:'transpose',delta:-1})">&#x266D;</button>
+  <span id="tp-val">0</span>
+  <button class="tp" onclick="sendCmd({cmd:'transpose',delta:1})">&#x266F;</button>
+</div>
 <div id="pwa-hint">
   Appuie sur <strong>&#x2191; Partager</strong> puis<br>
   <strong>« Sur l'écran d'accueil »</strong><br>
@@ -362,6 +418,25 @@ function doInterleave(chords, lyricEl, breaks) {
   }
 }
 
+// ── Commandes iPad ────────────────────────────────────────────────────────
+function sendCmd(data) {
+  fetch('/cmd', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).catch(() => {});
+}
+
+function updateAutoBtn(active) {
+  const btn = document.getElementById('btn-auto');
+  if (active) { btn.classList.add('on'); btn.innerHTML = '&#x23F8;'; }
+  else         { btn.classList.remove('on'); btn.innerHTML = '&#x25B6;&#x25B6;'; }
+}
+
+function updateTranspose(val) {
+  document.getElementById('tp-val').textContent = (val > 0 ? '+' : '') + val;
+}
+
 // ── SSE ───────────────────────────────────────────────────────────────────
 function connect() {
   const es = new EventSource('/events');
@@ -377,6 +452,10 @@ function connect() {
     } else if (d.type === 'scroll_line') {
       const el = document.querySelector('#content p[data-block="' + d.index + '"]');
       if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset);
+    } else if (d.type === 'autoscroll') {
+      updateAutoBtn(d.active);
+    } else if (d.type === 'transpose') {
+      updateTranspose(d.value);
     }
   };
   es.onerror = () => {
@@ -402,6 +481,7 @@ class PromptWebServer:
         self._server: HTTPServer | None = None
         self._last_html: str = ""           # contenu quand le prompteur est actif
         self._last_setlist: list[str] = []  # titres quand le prompteur est arrêté
+        self._command_queue: list = []      # commandes reçues depuis l'iPad
 
     # ── API publique ─────────────────────────────────────────────────────────
 
@@ -437,6 +517,21 @@ class PromptWebServer:
         """Envoie l'index du paragraphe visible en haut du viewport."""
         self._broadcast(json.dumps({"type": "scroll_line", "index": index}))
 
+    def push_autoscroll(self, active: bool):
+        """Synchronise l'état auto-scroll sur les clients web."""
+        self._broadcast(json.dumps({"type": "autoscroll", "active": active}))
+
+    def push_transpose(self, value: int):
+        """Synchronise la valeur de transposition sur les clients web."""
+        self._broadcast(json.dumps({"type": "transpose", "value": value}))
+
+    def poll_commands(self) -> list:
+        """Retourne et vide la file des commandes reçues depuis l'iPad."""
+        with self._lock:
+            cmds = self._command_queue[:]
+            self._command_queue.clear()
+        return cmds
+
     # ── Interne ──────────────────────────────────────────────────────────────
 
     def _broadcast(self, data: str):
@@ -470,6 +565,22 @@ class PromptWebServer:
         srv = self
 
         class _H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                if self.path == '/cmd':
+                    try:
+                        n = int(self.headers.get('Content-Length', 0))
+                        data = json.loads(self.rfile.read(n)) if n else {}
+                        with srv._lock:
+                            srv._command_queue.append(data)
+                    except Exception:
+                        pass
+                    self.send_response(204)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
             def do_GET(self):
                 if self.path in ("/", "/index.html"):
                     b = _INDEX.encode()

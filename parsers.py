@@ -254,6 +254,35 @@ def _parse_lines(lines: list, file_path: str) -> Song:
     )
 
 
+# ─── Transposition ───────────────────────────────────────────────────────────
+
+_NOTES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+_NOTES_FLAT  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
+_NOTE_INDEX: dict[str, int] = {n: i for i, n in enumerate(_NOTES_SHARP)}
+_NOTE_INDEX.update({n: i for i, n in enumerate(_NOTES_FLAT) if n not in _NOTE_INDEX})
+
+
+def _tp_root(root: str, semitones: int) -> str:
+    idx = _NOTE_INDEX.get(root, -1)
+    if idx < 0:
+        return root
+    new = (idx + semitones) % 12
+    return (_NOTES_FLAT if len(root) > 1 and root[1] == 'b' else _NOTES_SHARP)[new]
+
+
+def transpose_chord(chord: str, semitones: int) -> str:
+    """Transpose un accord ('Am7', 'F#/C#'…) par `semitones` demi-tons."""
+    if not semitones:
+        return chord
+    m = re.match(r'^([A-G][#b]?)([^/\*]*)(/[A-G][#b]?)?\*?$', chord)
+    if not m:
+        return chord
+    root, qual, bass = m.group(1), m.group(2) or '', m.group(3) or ''
+    star = '*' if chord.endswith('*') else ''
+    new_bass = ('/' + _tp_root(bass[1:], semitones)) if bass else ''
+    return _tp_root(root, semitones) + qual + new_bass + star
+
+
 def _extract_order(filename: str) -> int:
     num = ""
     for ch in filename:

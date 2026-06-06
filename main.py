@@ -68,7 +68,10 @@ _TR = {
         "screen_tip":     "Clic gauche : sélectionner\nClic droit : identifier l'écran",
         "choose_dir":     "Choisir le répertoire des chansons",
         "error":          "Erreur : ",
-        "prompter_hint":  "← / clic gauche : chanson précédente   |   ↑↓ / molette : défilement   |   → / clic droit : chanson suivante",
+        "autoscroll":     "Défilement auto",
+        "transpose":      "Transposition :",
+        "reset":          "↺",
+        "prompter_hint":  "← préc   ↑↓ défilement   → suiv   S auto-scroll   T / ⇧T transposer",
     },
     "en": {
         "ctrl_title":     "Prompt-Live — Control",
@@ -101,7 +104,10 @@ _TR = {
         "screen_tip":     "Left click: select\nRight click: identify screen",
         "choose_dir":     "Choose songs directory",
         "error":          "Error: ",
-        "prompter_hint":  "← / left click: previous song   |   ↑↓ / wheel: scroll   |   → / right click: next song",
+        "autoscroll":     "Auto-scroll",
+        "transpose":      "Transpose:",
+        "reset":          "↺",
+        "prompter_hint":  "← prev   ↑↓ scroll   → next   S auto-scroll   T / ⇧T transpose",
     },
 }
 
@@ -133,6 +139,9 @@ from parsers import load_songs, Song
 
 _SPEED_PX = {1: 60, 2: 100, 3: 160, 4: 240, 5: 340}
 _ANIM_MS  = 380
+
+_AUTO_SCROLL_SPEEDS      = {1: 20, 2: 40, 3: 60, 4: 90, 5: 130}  # px/seconde
+_AUTO_SCROLL_INTERVAL_MS = 50
 
 # ─── Support pédale Bluetooth ─────────────────────────────────────────────────
 # Touches interceptées globalement pour la pédale (configurables ici)
@@ -223,17 +232,25 @@ from editor import EditorWindow
 class PrompterView(QTextBrowser):
     """QTextBrowser avec gestion du scroll molette et clics de navigation."""
 
-    def __init__(self, on_prev, on_next, on_scroll=None):
+    def __init__(self, on_prev, on_next, on_scroll=None, on_autoscroll_changed=None):
         super().__init__()
         self._on_prev   = on_prev
         self._on_next   = on_next
         self._on_scroll = on_scroll  # callable(ratio: float)
+        self._on_autoscroll_changed = on_autoscroll_changed  # callable(active: bool)
         self._scroll_px    = _SPEED_PX[3]
         self._emit_enabled = True
         self._anim = QPropertyAnimation(self.verticalScrollBar(), b"value")
         self._anim.setDuration(_ANIM_MS)
         self._anim.setEasingCurve(QEasingCurve.Type.OutQuint)
         self.verticalScrollBar().valueChanged.connect(self._on_value_changed)
+        # Auto-scroll
+        self._auto_active   = False
+        self._auto_accum    = 0.0
+        self._auto_px_tick  = _AUTO_SCROLL_SPEEDS[3] * _AUTO_SCROLL_INTERVAL_MS / 1000.0
+        self._auto_timer    = QTimer()
+        self._auto_timer.setInterval(_AUTO_SCROLL_INTERVAL_MS)
+        self._auto_timer.timeout.connect(self._auto_tick)
         self.setReadOnly(True)
         self.setOpenLinks(False)
         self.setStyleSheet("""
@@ -297,6 +314,48 @@ class PrompterView(QTextBrowser):
         elif event.button() == Qt.MouseButton.LeftButton:
             self._on_prev()
 
+    # ── Auto-scroll ───────────────────────────────────────────────────────────
+
+    def _auto_tick(self):
+        sb = self.verticalScrollBar()
+        if sb.value() >= sb.maximum():
+            self._auto_timer.stop()
+            self._auto_active = False
+            if self._on_autoscroll_changed:
+                self._on_autoscroll_changed(False)
+            return
+        self._auto_accum += self._auto_px_tick
+        if self._auto_accum >= 1.0:
+            delta = int(self._auto_accum)
+            self._auto_accum -= delta
+            sb.setValue(sb.value() + delta)
+
+    def toggle_auto_scroll(self) -> bool:
+        self._auto_active = not self._auto_active
+        if self._auto_active:
+            self._auto_accum = 0.0
+            self._auto_timer.start()
+        else:
+            self._auto_timer.stop()
+        if self._on_autoscroll_changed:
+            self._on_autoscroll_changed(self._auto_active)
+        return self._auto_active
+
+    def set_auto_scroll_active(self, active: bool):
+        if active == self._auto_active:
+            return
+        self.toggle_auto_scroll()
+
+    def set_auto_scroll_speed(self, speed: int):
+        self._auto_px_tick = _AUTO_SCROLL_SPEEDS.get(speed, 60) * _AUTO_SCROLL_INTERVAL_MS / 1000.0
+
+    def stop_auto_scroll(self):
+        if self._auto_active:
+            self._auto_timer.stop()
+            self._auto_active = False
+            if self._on_autoscroll_changed:
+                self._on_autoscroll_changed(False)
+
 
 # ─── Fenêtre du prompteur ─────────────────────────────────────────────────────
 
@@ -307,17 +366,21 @@ class PrompterWindow(QMainWindow):
     ZOOM_MAX = 3.0
 
     def __init__(self, songs: list[Song], start_index: int = 0, on_navigate=None, on_scroll=None, on_display=None,
-                 font_family: str = "'Courier New',Courier,monospace", scroll_speed: int = 3):
+                 font_family: str = "'Courier New',Courier,monospace", scroll_speed: int = 3,
+                 transpose: int = 0, on_transpose=None, on_autoscroll=None):
         super().__init__()
         self.songs = songs
         self.current_index = start_index
         self._zoom = 1.0
         self._show_chords: bool | None = None
-        self._on_navigate  = on_navigate
-        self._on_scroll    = on_scroll
-        self._on_display   = on_display
-        self._scroll_speed = scroll_speed
-        self._font_family  = font_family
+        self._on_navigate   = on_navigate
+        self._on_scroll     = on_scroll
+        self._on_display    = on_display
+        self._on_transpose  = on_transpose   # callable(value: int)
+        self._on_autoscroll = on_autoscroll  # callable(active: bool)
+        self._scroll_speed  = scroll_speed
+        self._font_family   = font_family
+        self._transpose     = transpose
 
         self._watcher = QFileSystemWatcher()
         self._watcher.fileChanged.connect(self._on_file_changed)
@@ -356,6 +419,18 @@ class PrompterWindow(QMainWindow):
         )
         header.addWidget(self.title_label, 1)
 
+        self.transpose_label = QLabel()
+        self.transpose_label.setStyleSheet(
+            "color: #ff9900; font-size: 13px; font-weight: bold;"
+        )
+        self.transpose_label.setVisible(False)
+        header.addWidget(self.transpose_label)
+
+        self.auto_label = QLabel("▶▶")
+        self.auto_label.setStyleSheet("color: #00cc66; font-size: 13px;")
+        self.auto_label.setVisible(False)
+        header.addWidget(self.auto_label)
+
         self.counter_label = QLabel()
         self.counter_label.setStyleSheet("color: #444444; font-size: 13px;")
         header.addWidget(self.counter_label)
@@ -384,6 +459,7 @@ class PrompterWindow(QMainWindow):
             on_prev=self.prev_song,
             on_next=self.next_song,
             on_scroll=self._emit_scroll,
+            on_autoscroll_changed=self._on_autoscroll_state,
         )
         self.view._scroll_px = _SPEED_PX.get(scroll_speed, 160)
         layout.addWidget(self.view, 1)
@@ -396,9 +472,13 @@ class PrompterWindow(QMainWindow):
 
         # Raccourcis clavier
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
-        QShortcut(QKeySequence("Ctrl+="), self, self._zoom_in)
-        QShortcut(QKeySequence("Ctrl+-"), self, self._zoom_out)
-        QShortcut(QKeySequence("A"),      self, self._toggle_chords)
+        QShortcut(QKeySequence("Ctrl+="),  self, self._zoom_in)
+        QShortcut(QKeySequence("Ctrl+-"),  self, self._zoom_out)
+        QShortcut(QKeySequence("A"),       self, self._toggle_chords)
+        QShortcut(QKeySequence("S"),       self, self._toggle_auto_scroll)
+        QShortcut(QKeySequence("T"),       self, self._transpose_up)
+        QShortcut(QKeySequence("Shift+T"), self, self._transpose_down)
+        QShortcut(QKeySequence("Ctrl+T"),  self, self._transpose_reset)
 
         self._display(self.current_index)
 
@@ -481,10 +561,48 @@ class PrompterWindow(QMainWindow):
 
     def _toggle_chords(self):
         song = self.songs[self.current_index]
-        # Premier appui : on bascule depuis la valeur du fichier
         current = song.show_chords if self._show_chords is None else self._show_chords
         self._show_chords = not current
         self._display(self.current_index)
+
+    # ── Auto-scroll ───────────────────────────────────────────────────────────
+
+    def _toggle_auto_scroll(self):
+        self.view.toggle_auto_scroll()
+
+    def _on_autoscroll_state(self, active: bool):
+        self.auto_label.setVisible(active)
+        if self._on_autoscroll:
+            self._on_autoscroll(active)
+
+    def set_auto_scroll_active(self, active: bool):
+        self.view.set_auto_scroll_active(active)
+
+    def set_auto_scroll_speed(self, speed: int):
+        self.view.set_auto_scroll_speed(speed)
+
+    # ── Transposition ─────────────────────────────────────────────────────────
+
+    def _transpose_up(self):
+        self.set_transpose(self._transpose + 1)
+
+    def _transpose_down(self):
+        self.set_transpose(self._transpose - 1)
+
+    def _transpose_reset(self):
+        self.set_transpose(0)
+
+    def set_transpose(self, value: int):
+        self._transpose = value
+        sign = "+" if value > 0 else ""
+        if value == 0:
+            self.transpose_label.setVisible(False)
+        else:
+            self.transpose_label.setText(f"♯{sign}{value}")
+            self.transpose_label.setVisible(True)
+        self._display(self.current_index)
+        if self._on_transpose:
+            self._on_transpose(value)
 
     # ── Affichage ─────────────────────────────────────────────────────────────
 
@@ -541,8 +659,10 @@ class PrompterWindow(QMainWindow):
         show_chords = song.show_chords if self._show_chords is None else self._show_chords
         cpl = self._chars_per_line(song)
         html = render_html(song, zoom=self._zoom, show_chords=show_chords,
-                           font_family=self._font_family, chars_per_line=cpl)
+                           font_family=self._font_family, chars_per_line=cpl,
+                           transpose=self._transpose)
         self.view.setHtml(html)
+        self.view.stop_auto_scroll()
         self.view.verticalScrollBar().setValue(0)
         if self._on_display:
             self._on_display(html)
@@ -603,6 +723,8 @@ class ControlWindow(QMainWindow):
         self._scroll_speed: int = int(settings.value("scroll_speed", 3))
         self._clock_enabled: bool = bool(settings.value("clock_enabled", False, type=bool))
         self._clock_size: int = int(settings.value("clock_size", 20))
+        self._transpose: int = 0
+        self._autoscroll_speed: int = 3
 
         global _LANG
         _LANG = settings.value("lang", "fr")
@@ -737,6 +859,53 @@ class ControlWindow(QMainWindow):
         web_row.addWidget(self._url_label, 1)
         layout.addLayout(web_row)
 
+        # ── Transposition ─────────────────────────────────────────────────────
+        sep_tp = QFrame(); sep_tp.setFrameShape(QFrame.Shape.HLine)
+        layout.addWidget(sep_tp)
+
+        tp_row = QHBoxLayout()
+        self._lbl_transpose = QLabel(_t("transpose"))
+        self._lbl_transpose.setStyleSheet("font-size: 11px;")
+        tp_row.addWidget(self._lbl_transpose)
+        self._btn_tp_down = QPushButton("▼")
+        self._btn_tp_down.setFixedWidth(28); self._btn_tp_down.setFixedHeight(22)
+        self._btn_tp_down.clicked.connect(self._transpose_down)
+        tp_row.addWidget(self._btn_tp_down)
+        self._lbl_tp_val = QLabel("0")
+        self._lbl_tp_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._lbl_tp_val.setFixedWidth(36)
+        self._lbl_tp_val.setStyleSheet("font-weight: bold; color: #ff9900;")
+        tp_row.addWidget(self._lbl_tp_val)
+        self._btn_tp_up = QPushButton("▲")
+        self._btn_tp_up.setFixedWidth(28); self._btn_tp_up.setFixedHeight(22)
+        self._btn_tp_up.clicked.connect(self._transpose_up)
+        tp_row.addWidget(self._btn_tp_up)
+        self._btn_tp_reset = QPushButton(_t("reset"))
+        self._btn_tp_reset.setFixedWidth(28); self._btn_tp_reset.setFixedHeight(22)
+        self._btn_tp_reset.clicked.connect(self._transpose_reset)
+        tp_row.addWidget(self._btn_tp_reset)
+        tp_row.addStretch()
+        layout.addLayout(tp_row)
+
+        # ── Auto-scroll ───────────────────────────────────────────────────────
+        as_row = QHBoxLayout()
+        self._autoscroll_cb = QCheckBox(_t("autoscroll"))
+        self._autoscroll_cb.toggled.connect(self._on_autoscroll_toggled)
+        as_row.addWidget(self._autoscroll_cb)
+        as_row.addSpacing(12)
+        self._lbl_as_slow = QLabel(_t("slow")); self._lbl_as_slow.setStyleSheet("font-size:10px;color:#888;")
+        as_row.addWidget(self._lbl_as_slow)
+        self._as_speed_slider = QSlider(Qt.Orientation.Horizontal)
+        self._as_speed_slider.setRange(1, 5)
+        self._as_speed_slider.setValue(self._autoscroll_speed)
+        self._as_speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self._as_speed_slider.setTickInterval(1)
+        self._as_speed_slider.valueChanged.connect(self._on_autoscroll_speed_changed)
+        as_row.addWidget(self._as_speed_slider, 1)
+        self._lbl_as_fast = QLabel(_t("fast")); self._lbl_as_fast.setStyleSheet("font-size:10px;color:#888;")
+        as_row.addWidget(self._lbl_as_fast)
+        layout.addLayout(as_row)
+
         # Boutons Lancer / Arrêter
         self.btn_launch = QPushButton(_t("launch"))
         self.btn_launch.setEnabled(False)
@@ -862,6 +1031,12 @@ class ControlWindow(QMainWindow):
         except OSError as e:
             self._url_label.setText(_t("port_error") + e.strerror)
 
+        # Polling des commandes reçues depuis l'iPad
+        self._cmd_timer = QTimer()
+        self._cmd_timer.setInterval(80)
+        self._cmd_timer.timeout.connect(self._process_web_commands)
+        self._cmd_timer.start()
+
         # Écoute les branchements/débranchements d'écrans
         QApplication.instance().screenAdded.connect(lambda _: self._build_screen_buttons())
         QApplication.instance().screenRemoved.connect(lambda _: self._build_screen_buttons())
@@ -907,6 +1082,11 @@ class ControlWindow(QMainWindow):
         self._pedal_debug_label.setText(_t("key_received") + "—")
         self._clock_cb.setText(_t("clock"))
         self._lbl_clock_size.setText(_t("size_label"))
+        self._lbl_transpose.setText(_t("transpose"))
+        self._btn_tp_reset.setText(_t("reset"))
+        self._autoscroll_cb.setText(_t("autoscroll"))
+        self._lbl_as_slow.setText(_t("slow"))
+        self._lbl_as_fast.setText(_t("fast"))
         self._update_lang_btn()
 
     # ── Pédale ────────────────────────────────────────────────────────────────
@@ -938,6 +1118,67 @@ class ControlWindow(QMainWindow):
         QSettings("Prompt-Live", "Prompt-Live").setValue("clock_size", size)
         for p in self._prompters:
             p.set_clock_size(size)
+
+    # ── Transposition ─────────────────────────────────────────────────────────
+
+    def _transpose_up(self):
+        self._set_transpose(self._transpose + 1)
+
+    def _transpose_down(self):
+        self._set_transpose(self._transpose - 1)
+
+    def _transpose_reset(self):
+        self._set_transpose(0)
+
+    def _set_transpose(self, value: int):
+        self._transpose = value
+        sign = "+" if value > 0 else ""
+        self._lbl_tp_val.setText(f"{sign}{value}" if value != 0 else "0")
+        self._lbl_tp_val.setStyleSheet(
+            f"font-weight: bold; color: {'#ff9900' if value != 0 else '#888888'};"
+        )
+        for p in self._prompters:
+            p.set_transpose(value)
+        self._web_server.push_transpose(value)
+
+    # ── Auto-scroll ───────────────────────────────────────────────────────────
+
+    def _on_autoscroll_toggled(self, checked: bool):
+        for p in self._prompters:
+            p.set_auto_scroll_active(checked)
+        self._web_server.push_autoscroll(checked)
+
+    def _on_autoscroll_speed_changed(self, value: int):
+        self._autoscroll_speed = value
+        for p in self._prompters:
+            p.set_auto_scroll_speed(value)
+
+    def _on_autoscroll_state(self, active: bool):
+        """Callback quand le prompteur change l'état auto-scroll (touche S)."""
+        self._autoscroll_cb.setChecked(active)
+        self._web_server.push_autoscroll(active)
+
+    # ── Commandes iPad ────────────────────────────────────────────────────────
+
+    def _process_web_commands(self):
+        for cmd in self._web_server.poll_commands():
+            c = cmd.get("cmd", "")
+            if not self._prompters:
+                continue
+            p = self._prompters[0]
+            if c == "next":
+                self._on_navigate(min(p.current_index + 1, len(self.songs) - 1))
+            elif c == "prev":
+                self._on_navigate(max(p.current_index - 1, 0))
+            elif c == "scroll":
+                px = _SPEED_PX.get(self._scroll_speed, 160)
+                p.view._smooth_scroll(px if cmd.get("d") == "down" else -px)
+            elif c == "autoscroll":
+                active = p.view.toggle_auto_scroll()
+                self._autoscroll_cb.setChecked(active)
+                self._web_server.push_autoscroll(active)
+            elif c == "transpose":
+                self._set_transpose(self._transpose + int(cmd.get("delta", 0)))
 
     # ── Police ────────────────────────────────────────────────────────────────
 
@@ -1112,7 +1353,11 @@ class ControlWindow(QMainWindow):
                                on_scroll=self._on_scroll,
                                on_display=self._web_server.push_song if i == 0 else None,
                                font_family=self._css_font(),
-                               scroll_speed=self._scroll_speed)
+                               scroll_speed=self._scroll_speed,
+                               transpose=self._transpose,
+                               on_transpose=self._set_transpose if i == 0 else None,
+                               on_autoscroll=self._on_autoscroll_state if i == 0 else None)
+            p.view.set_auto_scroll_speed(self._autoscroll_speed)
             p.setGeometry(scr.geometry())
             p.showFullScreen()
             self._prompters.append(p)
@@ -1124,6 +1369,7 @@ class ControlWindow(QMainWindow):
         for p in self._prompters:
             p.close()
         self._prompters.clear()
+        self._autoscroll_cb.setChecked(False)
         self.btn_stop.setEnabled(False)
         self.btn_launch.setEnabled(bool(self.songs))
         self._web_server.push_setlist([s.title for s in self.songs])
