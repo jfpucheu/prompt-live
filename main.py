@@ -71,6 +71,8 @@ _TR = {
         "autoscroll":     "Défilement auto",
         "transpose":      "Transposition :",
         "reset":          "↺",
+        "tab_main":       "Accueil",
+        "tab_params":     "Paramètres",
         "prompter_hint":  "← préc   ↑↓ défilement   → suiv   S auto-scroll   T / ⇧T transposer",
     },
     "en": {
@@ -107,6 +109,8 @@ _TR = {
         "autoscroll":     "Auto-scroll",
         "transpose":      "Transpose:",
         "reset":          "↺",
+        "tab_main":       "Main",
+        "tab_params":     "Settings",
         "prompter_hint":  "← prev   ↑↓ scroll   → next   S auto-scroll   T / ⇧T transpose",
     },
 }
@@ -118,7 +122,7 @@ def _t(key: str) -> str:
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QLabel, QFileDialog, QFrame, QTextBrowser,
-    QComboBox, QSlider, QCheckBox, QSpinBox,
+    QComboBox, QSlider, QCheckBox, QSpinBox, QTabWidget,
 )
 from PyQt6.QtCore import Qt, QSettings, QFileSystemWatcher, QTimer, QPropertyAnimation, QEasingCurve, QPoint, QObject, QEvent
 from PyQt6.QtGui import QKeySequence, QShortcut, QWheelEvent, QMouseEvent, QFont, QFontMetrics
@@ -729,16 +733,19 @@ class ControlWindow(QMainWindow):
         global _LANG
         _LANG = settings.value("lang", "fr")
 
+        pedal_enabled = bool(settings.value("pedal_enabled", True, type=bool))
+        pedal_speed   = int(settings.value("pedal_speed", 3))
+
         self.setWindowTitle(_t("ctrl_title"))
-        self.setMinimumSize(460, 580)
+        self.setMinimumSize(460, 520)
 
         root = QWidget()
         self.setCentralWidget(root)
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
 
-        # Titre + sélecteur de langue
+        # Titre + sélecteur de langue (toujours visible)
         title_row = QHBoxLayout()
         self._lbl_title = QLabel(_t("app_title"))
         self._lbl_title.setStyleSheet("font-size: 17px; font-weight: bold;")
@@ -755,7 +762,18 @@ class ControlWindow(QMainWindow):
         title_row.addWidget(self._lang_btn)
         layout.addLayout(title_row)
 
-        # Sélection du répertoire
+        # ── Onglets ───────────────────────────────────────────────────────────
+        self._tab_widget = QTabWidget()
+        layout.addWidget(self._tab_widget, 1)
+
+        # ─────────────────────────────────────────────────────────────────────
+        # Onglet Accueil
+        # ─────────────────────────────────────────────────────────────────────
+        tab_main = QWidget()
+        lay_m = QVBoxLayout(tab_main)
+        lay_m.setContentsMargins(8, 10, 8, 8)
+        lay_m.setSpacing(8)
+
         dir_row = QHBoxLayout()
         self.dir_label = QLabel(self._last_dir or _t("no_dir"))
         self.dir_label.setStyleSheet("color: #555; font-size: 11px;")
@@ -765,9 +783,8 @@ class ControlWindow(QMainWindow):
         self._btn_dir.setFixedWidth(80)
         self._btn_dir.clicked.connect(self._choose_dir)
         dir_row.addWidget(self._btn_dir)
-        layout.addLayout(dir_row)
+        lay_m.addLayout(dir_row)
 
-        # Boutons Recharger + Éditer
         reload_row = QHBoxLayout()
         self._btn_reload = QPushButton(_t("reload"))
         self._btn_reload.clicked.connect(self._reload)
@@ -775,21 +792,96 @@ class ControlWindow(QMainWindow):
         self._btn_edit = QPushButton(_t("edit_songs"))
         self._btn_edit.clicked.connect(self._open_editor)
         reload_row.addWidget(self._btn_edit)
-        layout.addLayout(reload_row)
+        lay_m.addLayout(reload_row)
 
-        # Liste des chansons
         self._lbl_songs = QLabel(_t("songs_label"))
         self._lbl_songs.setStyleSheet("font-size: 11px; color: #666;")
-        layout.addWidget(self._lbl_songs)
+        lay_m.addWidget(self._lbl_songs)
 
         self.song_list = QListWidget()
         self.song_list.setStyleSheet("font-size: 13px;")
         self.song_list.itemDoubleClicked.connect(self._double_click)
-        layout.addWidget(self.song_list, 1)
+        lay_m.addWidget(self.song_list, 1)
 
-        # ── Police ────────────────────────────────────────────────────────────
-        sep0 = QFrame(); sep0.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep0)
+        sep_scr = QFrame(); sep_scr.setFrameShape(QFrame.Shape.HLine)
+        lay_m.addWidget(sep_scr)
+
+        screen_header = QHBoxLayout()
+        self._lbl_screens = QLabel(_t("screens_label"))
+        screen_header.addWidget(self._lbl_screens)
+        self._btn_refresh = QPushButton("↺")
+        self._btn_refresh.setFixedWidth(30)
+        self._btn_refresh.setFixedHeight(22)
+        self._btn_refresh.setToolTip(_t("refresh_tip"))
+        self._btn_refresh.clicked.connect(self._build_screen_buttons)
+        screen_header.addWidget(self._btn_refresh)
+        screen_header.addStretch()
+        lay_m.addLayout(screen_header)
+
+        self.screens_row = QHBoxLayout()
+        self.screens_row.setSpacing(6)
+        lay_m.addLayout(self.screens_row)
+
+        sep_web = QFrame(); sep_web.setFrameShape(QFrame.Shape.HLine)
+        lay_m.addWidget(sep_web)
+
+        web_row = QHBoxLayout()
+        self._lbl_web = QLabel(_t("web_label"))
+        self._lbl_web.setStyleSheet("font-size: 11px;")
+        web_row.addWidget(self._lbl_web)
+        self._url_label = QLabel(_t("web_starting"))
+        self._url_label.setStyleSheet(
+            "color: #1a6ee0; font-size: 12px; font-family: 'Menlo', monospace;"
+        )
+        self._url_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._url_label.setCursor(Qt.CursorShape.IBeamCursor)
+        web_row.addWidget(self._url_label, 1)
+        lay_m.addLayout(web_row)
+
+        sep_btn = QFrame(); sep_btn.setFrameShape(QFrame.Shape.HLine)
+        lay_m.addWidget(sep_btn)
+
+        self.btn_launch = QPushButton(_t("launch"))
+        self.btn_launch.setEnabled(False)
+        self.btn_launch.setFixedHeight(44)
+        self.btn_launch.setStyleSheet("""
+            QPushButton {
+                font-size: 14px; border-radius: 6px; border: none;
+                background-color: #cccccc; color: #888888;
+            }
+            QPushButton:enabled { background-color: #1a1a2e; color: #ffffff; }
+            QPushButton:enabled:hover { background-color: #2a2a5e; }
+        """)
+        self.btn_launch.clicked.connect(lambda: self._launch(0))
+
+        self.btn_stop = QPushButton(_t("stop"))
+        self.btn_stop.setEnabled(False)
+        self.btn_stop.setFixedHeight(44)
+        self.btn_stop.setStyleSheet("""
+            QPushButton {
+                font-size: 14px; border-radius: 6px; border: none;
+                background-color: #cccccc; color: #888888;
+            }
+            QPushButton:enabled { background-color: #5a0000; color: #ffffff; }
+            QPushButton:enabled:hover { background-color: #8a0000; }
+        """)
+        self.btn_stop.clicked.connect(self._stop)
+
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.btn_launch)
+        btn_row.addWidget(self.btn_stop)
+        lay_m.addLayout(btn_row)
+
+        self._tab_widget.addTab(tab_main, _t("tab_main"))
+        self._build_screen_buttons()
+
+        # ─────────────────────────────────────────────────────────────────────
+        # Onglet Paramètres
+        # ─────────────────────────────────────────────────────────────────────
+        tab_params = QWidget()
+        lay_p = QVBoxLayout(tab_params)
+        lay_p.setContentsMargins(8, 10, 8, 8)
+        lay_p.setSpacing(8)
 
         font_row = QHBoxLayout()
         self._lbl_font = QLabel(_t("font_label"))
@@ -802,9 +894,8 @@ class ControlWindow(QMainWindow):
             self._font_combo.setCurrentIndex(idx)
         self._font_combo.currentTextChanged.connect(self._on_font_changed)
         font_row.addWidget(self._font_combo, 1)
-        layout.addLayout(font_row)
+        lay_p.addLayout(font_row)
 
-        # ── Vitesse de défilement ──────────────────────────────────────────────
         speed_row = QHBoxLayout()
         self._lbl_scroll = QLabel(_t("scroll_label"))
         speed_row.addWidget(self._lbl_scroll)
@@ -819,49 +910,10 @@ class ControlWindow(QMainWindow):
         self._lbl_fast = QLabel(_t("fast")); self._lbl_fast.setStyleSheet("font-size:10px;color:#888;")
         speed_row.insertWidget(1, self._lbl_slow)
         speed_row.addWidget(self._lbl_fast)
-        layout.addLayout(speed_row)
+        lay_p.addLayout(speed_row)
 
-        # ── Sélection des écrans ───────────────────────────────────────────────
-        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep)
-
-        screen_header = QHBoxLayout()
-        self._lbl_screens = QLabel(_t("screens_label"))
-        screen_header.addWidget(self._lbl_screens)
-        self._btn_refresh = QPushButton("↺")
-        self._btn_refresh.setFixedWidth(30)
-        self._btn_refresh.setFixedHeight(22)
-        self._btn_refresh.setToolTip(_t("refresh_tip"))
-        self._btn_refresh.clicked.connect(self._build_screen_buttons)
-        screen_header.addWidget(self._btn_refresh)
-        screen_header.addStretch()
-        layout.addLayout(screen_header)
-
-        self.screens_row = QHBoxLayout()
-        self.screens_row.setSpacing(6)
-        layout.addLayout(self.screens_row)
-
-        # ── Accès web (iPad / navigateur) ─────────────────────────────────────
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep2)
-
-        web_row = QHBoxLayout()
-        self._lbl_web = QLabel(_t("web_label"))
-        self._lbl_web.setStyleSheet("font-size: 11px;")
-        web_row.addWidget(self._lbl_web)
-        self._url_label = QLabel(_t("web_starting"))
-        self._url_label.setStyleSheet(
-            "color: #1a6ee0; font-size: 12px; font-family: 'Menlo', monospace;"
-        )
-        self._url_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self._url_label.setCursor(Qt.CursorShape.IBeamCursor)
-        web_row.addWidget(self._url_label, 1)
-        layout.addLayout(web_row)
-
-        # ── Transposition ─────────────────────────────────────────────────────
         sep_tp = QFrame(); sep_tp.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep_tp)
+        lay_p.addWidget(sep_tp)
 
         tp_row = QHBoxLayout()
         self._lbl_transpose = QLabel(_t("transpose"))
@@ -874,7 +926,7 @@ class ControlWindow(QMainWindow):
         self._lbl_tp_val = QLabel("0")
         self._lbl_tp_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_tp_val.setFixedWidth(36)
-        self._lbl_tp_val.setStyleSheet("font-weight: bold; color: #ff9900;")
+        self._lbl_tp_val.setStyleSheet("font-weight: bold; color: #888888;")
         tp_row.addWidget(self._lbl_tp_val)
         self._btn_tp_up = QPushButton("▲")
         self._btn_tp_up.setFixedWidth(28); self._btn_tp_up.setFixedHeight(22)
@@ -885,9 +937,8 @@ class ControlWindow(QMainWindow):
         self._btn_tp_reset.clicked.connect(self._transpose_reset)
         tp_row.addWidget(self._btn_tp_reset)
         tp_row.addStretch()
-        layout.addLayout(tp_row)
+        lay_p.addLayout(tp_row)
 
-        # ── Auto-scroll ───────────────────────────────────────────────────────
         as_row = QHBoxLayout()
         self._autoscroll_cb = QCheckBox(_t("autoscroll"))
         self._autoscroll_cb.toggled.connect(self._on_autoscroll_toggled)
@@ -904,72 +955,16 @@ class ControlWindow(QMainWindow):
         as_row.addWidget(self._as_speed_slider, 1)
         self._lbl_as_fast = QLabel(_t("fast")); self._lbl_as_fast.setStyleSheet("font-size:10px;color:#888;")
         as_row.addWidget(self._lbl_as_fast)
-        layout.addLayout(as_row)
+        lay_p.addLayout(as_row)
 
-        # Boutons Lancer / Arrêter
-        self.btn_launch = QPushButton(_t("launch"))
-        self.btn_launch.setEnabled(False)
-        self.btn_launch.setFixedHeight(44)
-        self.btn_launch.setStyleSheet("""
-            QPushButton {
-                font-size: 14px;
-                border-radius: 6px;
-                border: none;
-                background-color: #cccccc;
-                color: #888888;
-            }
-            QPushButton:enabled {
-                background-color: #1a1a2e;
-                color: #ffffff;
-            }
-            QPushButton:enabled:hover {
-                background-color: #2a2a5e;
-            }
-        """)
-        self.btn_launch.clicked.connect(lambda: self._launch(0))
-
-        self.btn_stop = QPushButton(_t("stop"))
-        self.btn_stop.setEnabled(False)
-        self.btn_stop.setFixedHeight(44)
-        self.btn_stop.setStyleSheet("""
-            QPushButton {
-                font-size: 14px;
-                border-radius: 6px;
-                border: none;
-                background-color: #cccccc;
-                color: #888888;
-            }
-            QPushButton:enabled {
-                background-color: #5a0000;
-                color: #ffffff;
-            }
-            QPushButton:enabled:hover {
-                background-color: #8a0000;
-            }
-        """)
-        self.btn_stop.clicked.connect(self._stop)
-
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self.btn_launch)
-        btn_row.addWidget(self.btn_stop)
-        layout.addLayout(btn_row)
-
-        self._build_screen_buttons()
-
-        # ── Pédale Bluetooth ──────────────────────────────────────────────────
-        sep3 = QFrame(); sep3.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep3)
-
-        settings = QSettings("Prompt-Live", "Prompt-Live")
-        pedal_enabled = bool(settings.value("pedal_enabled", True, type=bool))
-        pedal_speed   = int(settings.value("pedal_speed", 3))
+        sep_ped = QFrame(); sep_ped.setFrameShape(QFrame.Shape.HLine)
+        lay_p.addWidget(sep_ped)
 
         pedal_row = QHBoxLayout()
         self._pedal_cb = QCheckBox(_t("pedal"))
         self._pedal_cb.setChecked(pedal_enabled)
         self._pedal_cb.toggled.connect(self._on_pedal_toggled)
         pedal_row.addWidget(self._pedal_cb)
-
         pedal_row.addSpacing(12)
         self._lbl_pedal_speed = QLabel(_t("speed_label"))
         pedal_row.addWidget(self._lbl_pedal_speed)
@@ -984,26 +979,24 @@ class ControlWindow(QMainWindow):
         self._lbl_pedal_fast = QLabel(_t("fast")); self._lbl_pedal_fast.setStyleSheet("font-size:10px;color:#888;")
         pedal_row.insertWidget(pedal_row.count() - 1, self._lbl_pedal_slow)
         pedal_row.addWidget(self._lbl_pedal_fast)
-        layout.addLayout(pedal_row)
+        lay_p.addLayout(pedal_row)
 
         self._pedal_hint_label = QLabel(_t("pedal_hint"))
         self._pedal_hint_label.setStyleSheet("font-size: 10px; color: #888;")
-        layout.addWidget(self._pedal_hint_label)
+        lay_p.addWidget(self._pedal_hint_label)
 
         self._pedal_debug_label = QLabel(_t("key_received") + "—")
         self._pedal_debug_label.setStyleSheet("font-size: 10px; color: #f90;")
-        layout.addWidget(self._pedal_debug_label)
+        lay_p.addWidget(self._pedal_debug_label)
 
-        # ── Horloge ───────────────────────────────────────────────────────────
-        sep4 = QFrame(); sep4.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep4)
+        sep_clk = QFrame(); sep_clk.setFrameShape(QFrame.Shape.HLine)
+        lay_p.addWidget(sep_clk)
 
         clock_row = QHBoxLayout()
         self._clock_cb = QCheckBox(_t("clock"))
         self._clock_cb.setChecked(self._clock_enabled)
         self._clock_cb.toggled.connect(self._on_clock_toggled)
         clock_row.addWidget(self._clock_cb)
-
         clock_row.addSpacing(12)
         self._lbl_clock_size = QLabel(_t("size_label"))
         clock_row.addWidget(self._lbl_clock_size)
@@ -1015,15 +1008,18 @@ class ControlWindow(QMainWindow):
         self._clock_spin.valueChanged.connect(self._on_clock_size)
         clock_row.addWidget(self._clock_spin)
         clock_row.addStretch()
-        layout.addLayout(clock_row)
+        lay_p.addLayout(clock_row)
 
+        lay_p.addStretch()
+        self._tab_widget.addTab(tab_params, _t("tab_params"))
+
+        # ── Infrastructure ────────────────────────────────────────────────────
         self._pedal_filter = _PedalFilter(lambda: self._prompters)
         self._pedal_filter.enabled    = pedal_enabled
         self._pedal_filter._scroll_px = _SPEED_PX.get(pedal_speed, 160)
         self._pedal_filter.debug_cb   = self._on_pedal_debug
         QApplication.instance().installEventFilter(self._pedal_filter)
 
-        # Serveur web — démarre immédiatement, affiche l'URL
         self._web_server = PromptWebServer()
         try:
             url = self._web_server.start()
@@ -1031,13 +1027,11 @@ class ControlWindow(QMainWindow):
         except OSError as e:
             self._url_label.setText(_t("port_error") + e.strerror)
 
-        # Polling des commandes reçues depuis l'iPad
         self._cmd_timer = QTimer()
         self._cmd_timer.setInterval(80)
         self._cmd_timer.timeout.connect(self._process_web_commands)
         self._cmd_timer.start()
 
-        # Écoute les branchements/débranchements d'écrans
         QApplication.instance().screenAdded.connect(lambda _: self._build_screen_buttons())
         QApplication.instance().screenRemoved.connect(lambda _: self._build_screen_buttons())
 
@@ -1087,6 +1081,8 @@ class ControlWindow(QMainWindow):
         self._autoscroll_cb.setText(_t("autoscroll"))
         self._lbl_as_slow.setText(_t("slow"))
         self._lbl_as_fast.setText(_t("fast"))
+        self._tab_widget.setTabText(0, _t("tab_main"))
+        self._tab_widget.setTabText(1, _t("tab_params"))
         self._update_lang_btn()
 
     # ── Pédale ────────────────────────────────────────────────────────────────
