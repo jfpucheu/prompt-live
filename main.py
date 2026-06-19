@@ -152,21 +152,23 @@ _PEDAL_UP_KEYS   = {Qt.Key.Key_Up, Qt.Key.Key_F6}
 class _PedalFilter(QObject):
     """Filtre d'événements global pour la pédale Bluetooth.
 
-    Appui bas  : défilement vers le bas.
-    2 appuis consécutifs en bas de page : chanson suivante.
-    Appui haut : défilement vers le haut.
+    Appui bas        : défilement vers le bas.
+    2 appuis en bas de page : chanson suivante.
+    Appui haut       : défilement vers le haut.
+    2 appuis en haut de page : chanson précédente (positionnée en bas).
     """
 
     BOTTOM_MARGIN = 8  # px de tolérance pour "en bas"
 
     def __init__(self, get_prompters):
         super().__init__()
-        self._get_prompters = get_prompters
-        self.enabled       = True
-        self._scroll_px    = _SPEED_PX[3]
-        self._bottom_count = 0  # appuis consécutifs en bas de page
-        self._top_count    = 0  # appuis consécutifs en haut de page
-        self.debug_cb      = None  # optionnel : callback(key_name: str)
+        self._get_prompters  = get_prompters
+        self.enabled         = True
+        self._scroll_px      = _SPEED_PX[3]
+        self._bottom_count   = 0
+        self._top_count      = 0
+        self.debug_cb        = None
+        self.autoscroll_mode = False  # True quand le défilement auto est activé
 
     def _at_bottom(self, view) -> bool:
         sb = view.verticalScrollBar()
@@ -176,12 +178,12 @@ class _PedalFilter(QObject):
         return view.verticalScrollBar().value() <= self.BOTTOM_MARGIN
 
     def eventFilter(self, _obj, event):
-        if event.type() != QEvent.Type.KeyPress or event.isAutoRepeat():
+        if event.type() != QEvent.Type.KeyPress:
             return False
 
         key = event.key()
 
-        if self.debug_cb:
+        if self.debug_cb and not event.isAutoRepeat():
             key_name = QKeySequence(key).toString() or f"0x{key:04X}"
             self.debug_cb(key_name)
 
@@ -199,6 +201,23 @@ class _PedalFilter(QObject):
 
         view = prompters[0].view
 
+        if event.isAutoRepeat():
+            return True  # pédale HID : pas d'auto-repeat utile
+
+        # ── Mode défilement auto ──────────────────────────────────────────────
+        if self.autoscroll_mode:
+            self._bottom_count = 0
+            self._top_count    = 0
+            if self._at_bottom(view):
+                # En bas : chanson suivante, défilement stoppé
+                view.stop_auto_scroll()
+                prompters[0].next_song()
+            else:
+                # Toggle start / pause
+                view.toggle_auto_scroll()
+            return True
+
+        # ── Mode manuel ───────────────────────────────────────────────────────
         if is_down:
             self._top_count = 0
             if self._at_bottom(view):
@@ -218,6 +237,8 @@ class _PedalFilter(QObject):
             if self._top_count >= 2:
                 self._top_count = 0
                 prompters[0].prev_song()
+                QTimer.singleShot(150, lambda: view.verticalScrollBar().setValue(
+                    view.verticalScrollBar().maximum()))
         else:
             self._top_count = 0
             view._smooth_scroll(-self._scroll_px)
@@ -1071,6 +1092,7 @@ class ControlWindow(QMainWindow):
     # ── Auto-scroll ───────────────────────────────────────────────────────────
 
     def _on_autoscroll_toggled(self, checked: bool):
+        self._pedal_filter.autoscroll_mode = checked
         for p in self._prompters:
             p.set_auto_scroll_active(checked)
         self._web_server.push_autoscroll(checked)
@@ -1081,8 +1103,10 @@ class ControlWindow(QMainWindow):
             p.set_auto_scroll_speed(value)
 
     def _on_autoscroll_state(self, active: bool):
-        """Callback quand le prompteur change l'état auto-scroll (touche S)."""
+        """Callback quand le prompteur change l'état auto-scroll (touche S ou pédale)."""
+        self._autoscroll_cb.blockSignals(True)
         self._autoscroll_cb.setChecked(active)
+        self._autoscroll_cb.blockSignals(False)
         self._web_server.push_autoscroll(active)
 
     # ── Commandes iPad ────────────────────────────────────────────────────────
