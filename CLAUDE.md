@@ -61,10 +61,20 @@ Objet central passé partout.
 ### `_PedalFilter` (main.py)
 Filtre d'événements installé sur `QApplication` — intercepte les touches pédale globalement.
 - `_PEDAL_DOWN_KEYS` / `_PEDAL_UP_KEYS` : sets de `Qt.Key` configurables en tête de fichier
-- `_bottom_count` / `_top_count` : compteurs d'appuis consécutifs en bas/haut de page
-- 2 appuis en bas → `next_song()` ; 2 appuis en haut → `prev_song()`
 - `enabled` et `_scroll_px` : pilotés par la section *Pédale BT* de `ControlWindow`
-- **IMPORTANT** : le filtre intercepte aussi `Key_Down`/`Key_Up` clavier — les auto-repeats sont laissés passer (`return False`) pour ne pas bloquer le défilement clavier continu
+- `autoscroll_mode` : booléen piloté par la checkbox *Défilement auto* de `ControlWindow`
+
+**Mode manuel** (`autoscroll_mode = False`) :
+- `_bottom_count` / `_top_count` : compteurs d'appuis consécutifs en bas/haut de page
+- 2 appuis en bas → `next_song()` ; 2 appuis en haut → `prev_song()` (positionné en bas)
+- 1 appui hors bord → `_smooth_scroll()`
+
+**Mode défilement auto** (`autoscroll_mode = True`, checkbox cochée) :
+- N'importe quelle touche pédale → `toggle_auto_scroll()` (démarre / met en pause)
+- En bas de page → `stop_auto_scroll()` + `next_song()` ; re-appui sur la nouvelle chanson pour redémarrer
+- **IMPORTANT** : `_on_autoscroll_state` utilise `blockSignals(True)` sur la checkbox pour éviter que le toggle pédale ne désactive `autoscroll_mode` via la callback
+
+**Pédale HID BLE** : n'envoie pas d'auto-repeats (un seul `KeyPress` par appui physique). Les auto-repeats sont absorbés (`return True`) sans action.
 
 ### `PromptWebServer` (web_server.py)
 - SSE sur `/events` : messages JSON `{type: "song"|"setlist"|"scroll", ...}`
