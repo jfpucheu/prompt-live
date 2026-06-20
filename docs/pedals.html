@@ -289,7 +289,8 @@
     <h2 class="section-title">⌨️ Touches reconnues par Prompt-Live</h2>
     <p class="section-desc">Prompt-Live écoute ces touches en intercepteur global — le prompteur n'a pas besoin d'être au premier plan.</p>
 
-    <table class="keys-table">
+    <h3 style="margin-bottom:1rem;font-size:1.1rem;">Mode manuel</h3>
+    <table class="keys-table" style="margin-bottom:2rem;">
       <thead>
         <tr>
           <th>Touches</th>
@@ -313,12 +314,41 @@
           <td><span class="action-chip">↑ Défilement vers le haut</span></td>
         </tr>
         <tr>
-          <td><span class="key-pill">↓</span> <span style="color:var(--muted);font-size:0.85rem;">en bas de page</span></td>
+          <td><span class="key-pill">↓</span> <span style="color:var(--muted);font-size:0.85rem;">×2 en bas de page</span></td>
           <td><span class="action-chip">→ Chanson suivante</span></td>
         </tr>
         <tr>
-          <td><span class="key-pill">↑</span> <span style="color:var(--muted);font-size:0.85rem;">en haut de page</span></td>
-          <td><span class="action-chip">← Chanson précédente</span></td>
+          <td><span class="key-pill">↑</span> <span style="color:var(--muted);font-size:0.85rem;">×2 en haut de page</span></td>
+          <td><span class="action-chip">← Chanson précédente (positionnée en bas)</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-bottom:0.5rem;font-size:1.1rem;">Mode défilement automatique</h3>
+    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1rem;">Activer la checkbox <strong style="color:var(--text);">Défilement auto</strong> dans la fenêtre de contrôle. La pédale pilote alors le défilement automatique :</p>
+    <table class="keys-table">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">N'importe quelle pédale — défilement arrêté</span></td>
+          <td><span class="action-chip">▶ Démarre le défilement auto</span></td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">N'importe quelle pédale — défilement en cours</span></td>
+          <td><span class="action-chip">⏸ Met en pause</span></td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">N'importe quelle pédale — en bas de page</span></td>
+          <td><span class="action-chip">→ Chanson suivante (défilement stoppé)</span></td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">N'importe quelle pédale — nouvelle chanson</span></td>
+          <td><span class="action-chip">▶ Redémarre le défilement</span></td>
         </tr>
       </tbody>
     </table>
