@@ -96,6 +96,7 @@ class Song:
     section_color:  str  = DEFAULT_SECTION_COLOR
     show_chords:    bool = True
     transpose:      int  = 0
+    speed:          Optional[int] = None  # 1–5, None = utilise la vitesse globale (clé : Vitesse:)
 
 
 # [Label]  ou  [Label]@Tag
@@ -131,6 +132,7 @@ def _parse_lines(lines: list, file_path: str) -> Song:
     section_color = DEFAULT_SECTION_COLOR
     show_chords   = True
     transpose     = 0
+    speed         = None
 
     # ── En-tête ───────────────────────────────────────────────────────────────
     i = 0
@@ -170,6 +172,12 @@ def _parse_lines(lines: list, file_path: str) -> Song:
         elif sl.startswith("transposition:"):
             try:
                 transpose = int(stripped.split(":", 1)[1].strip())
+            except ValueError:
+                pass
+        elif sl.startswith("vitesse:"):
+            try:
+                v = int(stripped.split(":", 1)[1].strip())
+                speed = max(1, min(5, v))
             except ValueError:
                 pass
         elif sl.startswith("couleursection:"):
@@ -259,6 +267,7 @@ def _parse_lines(lines: list, file_path: str) -> Song:
         section_color=section_color,
         show_chords=show_chords,
         transpose=transpose,
+        speed=speed,
     )
 
 

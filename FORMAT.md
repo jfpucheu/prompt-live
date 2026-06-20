@@ -12,6 +12,7 @@
 | `CouleurSection:` | `CouleurSection: jaune` | `#AAAAAA` |
 | `CouleurAccords:` | `CouleurAccords: gris` | `#888888` |
 | `AfficherAccords:` | `AfficherAccords: non` | `oui` |
+| `Vitesse:` | `Vitesse: 4` | _(vitesse globale)_ |
 | `@Prenom: couleur` | `@Vanessa: Rouge` | _(définit une couleur)_ |
 
 ## Dans le contenu
@@ -38,6 +39,7 @@ TailleAccords: 18
 TailleSection: 14
 CouleurSection: jaune
 CouleurAccords: gris
+Vitesse: 2
 
 @Vanessa: Rouge
 @Guillaume: Bleu

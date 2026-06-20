@@ -423,6 +423,7 @@ class PrompterWindow(QMainWindow):
         self._on_autoscroll = on_autoscroll  # callable(active: bool)
         self._scroll_speed  = scroll_speed
         self._font_family   = font_family
+        self._default_autoscroll_speed: int = 3
 
         self._watcher = QFileSystemWatcher()
         self._watcher.fileChanged.connect(self._on_file_changed)
@@ -611,6 +612,7 @@ class PrompterWindow(QMainWindow):
         self.view.set_auto_scroll_active(active)
 
     def set_auto_scroll_speed(self, speed: int):
+        self._default_autoscroll_speed = speed
         self.view.set_auto_scroll_speed(speed)
 
     # ── Affichage ─────────────────────────────────────────────────────────────
@@ -670,6 +672,9 @@ class PrompterWindow(QMainWindow):
         html = render_html(song, zoom=self._zoom, show_chords=show_chords,
                            font_family=self._font_family, chars_per_line=cpl)
         self.view.setHtml(html)
+        self.view.set_auto_scroll_speed(
+            song.speed if song.speed is not None else self._default_autoscroll_speed
+        )
         self.view.stop_auto_scroll()
         self.view.verticalScrollBar().setValue(0)
         if self._on_display:
@@ -1316,7 +1321,7 @@ class ControlWindow(QMainWindow):
                                font_family=self._css_font(),
                                scroll_speed=self._scroll_speed,
                                on_autoscroll=self._on_autoscroll_state if i == 0 else None)
-            p.view.set_auto_scroll_speed(self._autoscroll_speed)
+            p.set_auto_scroll_speed(self._autoscroll_speed)
             p.setGeometry(scr.geometry())
             p.showFullScreen()
             self._prompters.append(p)
