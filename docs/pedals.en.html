@@ -233,7 +233,8 @@
     <h2 class="section-title">⌨️ Keys recognized by Prompt-Live</h2>
     <p class="section-desc">Prompt-Live listens for these keys globally — the prompter window does not need to be in focus.</p>
 
-    <table class="keys-table">
+    <h3 style="margin-bottom:1rem;font-size:1.1rem;">Manual mode</h3>
+    <table class="keys-table" style="margin-bottom:2rem;">
       <thead>
         <tr>
           <th>Keys</th>
@@ -257,12 +258,41 @@
           <td><span class="action-chip">↑ Scroll up</span></td>
         </tr>
         <tr>
-          <td><span class="key-pill">↓</span> <span style="color:var(--muted);font-size:0.85rem;">at bottom of page</span></td>
+          <td><span class="key-pill">↓</span> <span style="color:var(--muted);font-size:0.85rem;">×2 at bottom of page</span></td>
           <td><span class="action-chip">→ Next song</span></td>
         </tr>
         <tr>
-          <td><span class="key-pill">↑</span> <span style="color:var(--muted);font-size:0.85rem;">at top of page</span></td>
-          <td><span class="action-chip">← Previous song</span></td>
+          <td><span class="key-pill">↑</span> <span style="color:var(--muted);font-size:0.85rem;">×2 at top of page</span></td>
+          <td><span class="action-chip">← Previous song (scrolled to bottom)</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-bottom:0.5rem;font-size:1.1rem;">Auto-scroll mode</h3>
+    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1rem;">Enable the <strong style="color:var(--text);">Auto-scroll</strong> checkbox in the control window. The pedal then controls auto-scrolling:</p>
+    <table class="keys-table">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">Any pedal — scroll stopped</span></td>
+          <td><span class="action-chip">▶ Start auto-scroll</span></td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">Any pedal — scroll running</span></td>
+          <td><span class="action-chip">⏸ Pause</span></td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">Any pedal — at bottom of page</span></td>
+          <td><span class="action-chip">→ Next song (scroll stopped)</span></td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--muted);font-size:0.9rem;">Any pedal — on new song</span></td>
+          <td><span class="action-chip">▶ Restart auto-scroll</span></td>
         </tr>
       </tbody>
     </table>
