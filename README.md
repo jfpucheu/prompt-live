@@ -3,7 +3,6 @@
 </p>
 
 <h1 align="center">Prompt-Live</h1>
-<p align="center"><em>Prompteur musical pour groupes live — paroles & accords sur grand écran</em></p>
 <p align="center"><em>Free open-source stage prompter for live bands — lyrics, chords & iPad sync</em></p>
 
 <p align="center">
@@ -15,43 +14,41 @@
 </p>
 
 <p align="center">
-  <a href="https://jfpucheu.github.io/prompt-live/">🌐 Website — jfpucheu.github.io/prompt-live</a>
-  &nbsp;|&nbsp;
-  <a href="https://jfpucheu.github.io/prompt-live/index.en.html">🇬🇧 English</a>
+  <a href="https://jfpucheu.github.io/prompt-live/index.en.html">🌐 Website — jfpucheu.github.io/prompt-live</a>
 </p>
 
 > **Free alternative to ProPresenter, OnSong and SongShow Plus** — display lyrics and chords on stage screens with real-time iPad sync and Bluetooth pedal support.
 
 ---
 
-## Aperçu
+## Screenshots
 
-| Fenêtre de contrôle | Mode prompteur | Éditeur |
+| Control window | Prompter | Editor |
 |---|---|---|
-| ![Contrôle](docs/screen-control.png) | ![Prompteur](docs/screen-prompter.png) | ![Éditeur](docs/screen-editor.png) |
+| ![Control](docs/screen-control.png) | ![Prompter](docs/screen-prompter.png) | ![Editor](docs/screen-editor.png) |
 
 ---
 
-## Présentation
+## Overview
 
-Prompt-Live est une application **macOS et Windows** pour afficher paroles et accords en temps réel sur scène. Elle est pensée pour les groupes avec plusieurs chanteurs : chaque interprète peut être coloré différemment, les accords sont affichés au-dessus des paroles, et tout défile en douceur depuis la table de régie.
+Prompt-Live is a **macOS and Windows** app for displaying lyrics and chords live on stage. Built for bands with multiple singers: each vocalist can be color-coded, chords are displayed above lyrics, and everything scrolls smoothly from the sound desk.
 
-**Fonctionnalités principales**
+**Key features**
 
-- Chargement d'un dossier de fichiers `.prompt` numérotés (ordre de passage automatique)
-- Affichage plein écran sur l'écran externe (retro-projecteur, TV scène…)
-- Défilement fluide avec animation, vitesse réglable (5 niveaux)
-- Navigation au clavier : ↑↓ défilement, ←→ chanson précédente/suivante
-- Support pédalier Bluetooth HID (↓ défile, 2× bas = chanson suivante, 2× haut = chanson précédente)
-- Synchronisation iPad/tablette via navigateur web (serveur SSE intégré)
-- Support multi-écrans : même ligne en haut sur tous les écrans
-- Éditeur intégré avec prévisualisation en direct
-- Coloration par chanteur / section
-- Polices monospace embarquées (PT Mono) pour un alignement parfait accords/paroles
+- Load a folder of numbered `.prompt` files — setlist order is automatic
+- Full-screen display on any external monitor or projector
+- Smooth auto-scroll with 5 speed levels, adjustable per song
+- Keyboard navigation: ↑↓ scroll, ←→ previous/next song
+- Bluetooth HID pedal support (↓ scrolls, 2× bottom = next song, 2× top = previous song)
+- Real-time iPad/tablet sync via built-in SSE web server — no app install needed
+- Multi-screen support — all displays stay in sync
+- Built-in editor with live preview
+- Per-singer and per-section color coding
+- Embedded monospace fonts (PT Mono) for perfect chord/lyric alignment
 
 ---
 
-## Installation (développement)
+## Installation (development)
 
 **macOS**
 ```bash
@@ -75,35 +72,35 @@ python main.py
 
 ---
 
-## Télécharger l'application
+## Download
 
-Rendez-vous sur la page [**Releases**](https://github.com/jfpucheu/prompt-live/releases) pour télécharger la dernière version compilée :
+Head to the [**Releases**](https://github.com/jfpucheu/prompt-live/releases) page to download the latest build:
 
-| Plateforme | Fichier |
-|-----------|---------|
+| Platform | File |
+|----------|------|
 | macOS Intel (x86_64) | `Prompt-Live-apple-intel.zip` |
 | macOS Apple Silicon (M1/M2/M3) | `Prompt-Live-apple-silicon.zip` |
 | Windows 10/11 (x64) | `Prompt-Live-windows-x64.zip` |
 
-**macOS** — Dézipper et glisser `Prompt-Live.app` dans votre dossier Applications.
+**macOS** — Unzip and drag `Prompt-Live.app` to your Applications folder.
 
-> **Sécurité macOS** : l'application n'est pas notarisée Apple. Au premier lancement, macOS peut bloquer silencieusement son démarrage. Ouvrir un Terminal et lancer :
+> **macOS security**: the app is not notarized by Apple. On first launch, macOS may silently block it. Open a Terminal and run:
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/Prompt-Live.app
 > ```
-> Puis lancer l'app normalement.
+> Then launch the app normally.
 
-**Windows** — Dézipper `Prompt-Live-windows-x64.zip` dans le dossier de votre choix et lancer `Prompt-Live.exe`.
+**Windows** — Unzip `Prompt-Live-windows-x64.zip` anywhere and run `Prompt-Live.exe`.
 
-> **Sécurité Windows** : SmartScreen peut afficher un avertissement au premier lancement ("Windows a protégé votre ordinateur"). Cliquer sur **Informations complémentaires** puis **Exécuter quand même**.
+> **Windows security**: SmartScreen may show a warning on first launch. Click **More info** then **Run anyway**. This only happens once.
 
 ---
 
-## Format des fichiers `.prompt`
+## `.prompt` file format
 
-Les fichiers sont de simples fichiers texte avec une syntaxe légère.
+Song files are plain text with a lightweight syntax.
 
-### En-tête
+### Header
 
 ```
 Titre: Amazing Grace
@@ -118,47 +115,48 @@ Vitesse: 2
 @Armelle: Violet
 ```
 
-| Balise | Description | Défaut |
-|--------|-------------|--------|
-| `Titre:` | Titre affiché | nom du fichier |
-| `TailleParoles:` | Taille de police des paroles | `28` |
-| `TailleAccords:` | Taille de police des accords | `18` |
-| `TailleSection:` | Taille des titres de section | `16` |
-| `CouleurSection:` | Couleur des titres de section | `#AAAAAA` |
-| `CouleurAccords:` | Couleur des accords | `#888888` |
-| `AfficherAccords:` | `oui` / `non` | `oui` |
-| `Vitesse:` | Vitesse de défilement auto pour cette chanson (1–5) | _(vitesse globale)_ |
-| `@Prenom: couleur` | Définit la couleur d'un chanteur | — |
+| Key | Description | Default |
+|-----|-------------|---------|
+| `Titre:` | Song title | filename |
+| `TailleParoles:` | Lyrics font size | `28` |
+| `TailleAccords:` | Chord font size | `18` |
+| `TailleSection:` | Section label font size | `16` |
+| `CouleurSection:` | Section label color | `#AAAAAA` |
+| `CouleurAccords:` | Chord color | `#888888` |
+| `AfficherAccords:` | Show chords: `oui` / `non` | `oui` |
+| `Vitesse:` | Auto-scroll speed for this song (1–5) | _(global speed)_ |
+| `@Name: color` | Defines a singer's color | — |
 
-### Contenu
+### Content
 
 ```
 [Intro]
-(Guitare acoustique — capo 2)
+(Acoustic guitar — capo 2)
 G         Cmaj7/E
 Amazing grace, how sweet the sound
 
-[Couplet 1]@Vanessa
+[Verse 1]@Vanessa
 D          G
 That saved a wretch like me @Guillaume
 ```
 
-| Syntaxe | Effet |
-|---------|-------|
-| `[Section]` | Titre de section |
-| `[Section]@Prenom` | Section entière colorée |
-| `Ligne @Prenom` | Ligne individuelle colorée |
-| `(note entre parenthèses)` | Note / indication de jeu (italique gris) |
-| Ligne courte au-dessus des paroles | Accord (police plus petite) |
+| Syntax | Effect |
+|--------|--------|
+| `[Section]` | Section label |
+| `[Section]@Name` | Entire section in that singer's color |
+| `Line @Name` | Individual line in that singer's color |
+| `(text in parentheses)` | Stage note / direction (italic grey) |
+| Short line above lyrics | Chord line (smaller font) |
 
-### Couleurs disponibles
+### Available colors
 
 `rouge` `bleu` `vert` `orange` `jaune` `violet` `cyan` `rose` `blanc` `gris`
-Ou code hexadécimal : `#FF8800`
 
-### Ordre de passage
+Or any hex code: `#FF8800`
 
-Préfixer les fichiers par un numéro pour définir l'ordre :
+### Setlist order
+
+Prefix files with a number to define the order:
 
 ```
 01_Amazing Grace.prompt
@@ -168,47 +166,47 @@ Préfixer les fichiers par un numéro pour définir l'ordre :
 
 ---
 
-## Utilisation
+## Usage
 
-### Lancer un concert
+### Running a show
 
-1. Ouvrir Prompt-Live et sélectionner le dossier de chansons
-2. Brancher le retro-projecteur / TV scène — il s'affiche automatiquement en plein écran
-3. Utiliser la fenêtre de contrôle pour naviguer et régler la vitesse
-4. Appuyer sur **Prompter** pour démarrer
+1. Open Prompt-Live and select your songs folder
+2. Connect your projector or stage TV — it appears automatically in full screen
+3. Use the control window to navigate and adjust speed
+4. Click **Launch** to start
 
-### Contrôles clavier (en mode prompteur)
+### Keyboard shortcuts (prompter mode)
 
-| Touche | Action |
-|--------|--------|
-| `↑` / `↓` | Défilement |
-| `→` / `Page Bas` | Chanson suivante |
-| `←` / `Page Haut` | Chanson précédente |
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Scroll |
+| `→` / `Page Down` | Next song |
+| `←` / `Page Up` | Previous song |
 
-### Pédalier Bluetooth
+### Bluetooth pedal
 
-Tout pédalier Bluetooth reconnu comme clavier HID est supporté nativement. Le filtre de touches fonctionne quelle que soit la fenêtre active (pas besoin que le prompteur soit au premier plan).
+Any Bluetooth pedal recognized as an HID keyboard is supported natively. The key filter works regardless of which window is focused — no need to keep the prompter in the foreground.
 
-| Geste | Action |
-|-------|--------|
-| Appui pédale bas (`↓`) | Défilement vers le bas |
-| 2 appuis consécutifs en bas de page | Chanson suivante |
-| Appui pédale haut (`↑`) | Défilement vers le haut |
-| 2 appuis consécutifs en haut de page | Chanson précédente |
+| Gesture | Action |
+|---------|--------|
+| Pedal down (`↓`) | Scroll down |
+| 2 presses at bottom of page | Next song |
+| Pedal up (`↑`) | Scroll up |
+| 2 presses at top of page | Previous song |
 
-La pédale peut être **activée / désactivée** et sa **vitesse de défilement** réglée indépendamment dans la fenêtre de contrôle (section *Pédale BT*).
+The pedal can be **enabled/disabled** and its **scroll speed** set independently in the control window (*BT Pedal* section).
 
-Touches reconnues : `↓`, `Espace`, `F5` (bas) — `↑`, `F6` (haut). Si votre pédale envoie d'autres touches, modifier `_PEDAL_DOWN_KEYS` / `_PEDAL_UP_KEYS` dans `main.py`.
+Recognized keys: `↓`, `Space`, `F5` (down) — `↑`, `F6` (up). If your pedal sends different keys, edit `_PEDAL_DOWN_KEYS` / `_PEDAL_UP_KEYS` in `main.py`.
 
-### Synchronisation iPad
+### iPad sync
 
-Sur le même réseau Wi-Fi, ouvrir un navigateur sur l'iPad et aller sur :
+On the same Wi-Fi network, open a browser on your iPad and go to:
 
 ```
-http://<IP de l'ordinateur>:8765
+http://<computer IP>:8765
 ```
 
-L'adresse IP est affichée dans la fenêtre de contrôle. La tablette suit le défilement en temps réel.
+The IP address is shown in the control window. The tablet follows the scroll in real time.
 
 ---
 
@@ -216,10 +214,10 @@ L'adresse IP est affichée dans la fenêtre de contrôle. La tablette suit le d�
 
 **macOS**
 ```bash
-# Générer l'icône (si modifiée)
+# Regenerate icon (if changed)
 python logo/make_icns.py
 
-# Compiler l'application
+# Build the app
 ./build.sh
 # → dist/Prompt-Live.app
 ```
@@ -231,7 +229,7 @@ python logo/make_icns.py
 # → dist\Prompt-Live\Prompt-Live.exe
 ```
 
-La CI GitHub Actions exécute les tests puis produit automatiquement les binaires macOS (Intel + Apple Silicon) et Windows lors d'un push de tag `v*` :
+GitHub Actions runs the tests and automatically produces macOS (Intel + Apple Silicon) and Windows binaries on any `v*` tag push:
 
 ```bash
 git tag v1.0.0
@@ -242,61 +240,45 @@ git push origin v1.0.0
 
 ## FAQ
 
-**L'app ne démarre pas (aucun message, aucune fenêtre) — macOS**
-> macOS bloque silencieusement les apps téléchargées non notarisées. Ouvrir un Terminal et lancer :
+**App doesn't start (no window, no error) — macOS**
+> macOS silently blocks unsigned downloaded apps. Open a Terminal and run:
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/Prompt-Live.app
 > ```
-> Puis relancer l'app normalement.
+> Then relaunch normally.
 
-**Windows SmartScreen bloque le lancement**
-> Cliquer sur **Informations complémentaires** dans la fenêtre d'avertissement, puis **Exécuter quand même**. Cette alerte apparaît uniquement au premier lancement sur les exécutables non signés.
+**Windows SmartScreen blocks the launch**
+> Click **More info** in the warning window, then **Run anyway**. This only happens on first launch for unsigned executables.
 
-**macOS bloque l'ouverture de l'app ("développeur non identifié")**
-> Faire clic droit → **Ouvrir** sur `Prompt-Live.app`. Confirmer dans la boîte de dialogue. À faire une seule fois.
+**macOS says "unidentified developer"**
+> Right-click → **Open** on `Prompt-Live.app`. Confirm in the dialog. Only needed once.
 
-**L'écran externe ne s'affiche pas en plein écran**
-> Vérifier que l'écran externe est bien détecté par macOS (Réglages Système → Écrans). Prompt-Live utilise automatiquement le deuxième écran au lancement du mode prompteur. Si branché après le démarrage, relancer le mode prompteur.
+**External screen doesn't go full screen**
+> Make sure the external display is detected by macOS (System Settings → Displays). Prompt-Live automatically uses the second screen when the prompter is launched. If you plugged it in after startup, relaunch the prompter.
 
-**L'iPad ne se connecte pas**
-> - Vérifier que l'ordinateur et l'iPad sont sur le **même réseau Wi-Fi**
-> - L'adresse IP est affichée dans la fenêtre de contrôle (ex. `http://192.168.1.10:8765`)
-> - Désactiver temporairement le pare-feu macOS si la connexion échoue (Réglages Système → Réseau → Pare-feu)
-> - Certains réseaux d'entreprise bloquent les connexions locales entre appareils
+**iPad won't connect**
+> - Make sure the computer and iPad are on the **same Wi-Fi network**
+> - The IP address is shown in the control window (e.g. `http://192.168.1.10:8765`)
+> - Temporarily disable the macOS firewall if the connection fails (System Settings → Network → Firewall)
+> - Some corporate networks block local device-to-device connections
 
-**Le défilement iPad est décalé par rapport à l'écran principal**
-> La sync se fait par numéro de ligne. Si les tailles de police sont très différentes entre l'écran et l'iPad, la ligne affichée peut légèrement différer — c'est normal.
+**iPad scroll is out of sync with the main screen**
+> Sync is line-number based. If font sizes differ significantly between the screen and the iPad, the displayed line may be slightly off — this is expected.
 
-**Les accords sont décalés par rapport aux paroles**
-> Utiliser uniquement des polices **monospace** (PT Mono est embarquée et sélectionnée par défaut). Helvetica, Arial et autres polices proportionnelles provoquent un décalage.
+**Chords are misaligned with lyrics**
+> Use only **monospace** fonts (PT Mono is embedded and selected by default). Helvetica, Arial and other proportional fonts cause alignment drift.
 
-**Une chanson n'apparaît pas dans la liste**
-> Les fichiers doivent avoir l'extension `.prompt` et être dans le dossier sélectionné. Les fichiers sans numéro de préfixe sont affichés en dernier.
+**A song doesn't appear in the list**
+> Files must have the `.prompt` extension and be in the selected folder. Files without a numeric prefix are shown last.
 
-**L'app ne se ferme pas quand un iPad est connecté**
-> Fermer la fenêtre de contrôle (croix rouge). Toutes les fenêtres et le serveur web se ferment ensemble. Si l'app reste en fond, forcer la fermeture avec `Cmd+Q`.
+**App won't close when an iPad is connected**
+> Close the control window (red button). All windows and the web server close together. If the app stays in the background, force-quit with `Cmd+Q`.
 
-**Modifier un fichier `.prompt` depuis un éditeur externe**
-> Prompt-Live surveille le dossier automatiquement. Toute modification enregistrée dans un éditeur externe est rechargée en direct sans redémarrer l'app.
-
----
-
-## English summary
-
-**Prompt-Live** is a free, open-source stage prompter for live bands and worship teams.
-
-- Display **lyrics and chords** full-screen on an external monitor or projector
-- **Color-code singers** — each vocalist gets their own color, per line or per section
-- **Auto-scroll** with 5 speed levels, controllable via Bluetooth foot pedal
-- **Real-time iPad sync** — any browser on the same Wi-Fi follows the scroll
-- **Per-song scroll speed** — set `Vitesse: 3` in the song file to override the global speed
-- Plain text `.prompt` files — edit with any text editor, version-controllable
-- Free alternative to **ProPresenter**, **OnSong**, **SongShow Plus**
-
-👉 [Full English documentation](https://jfpucheu.github.io/prompt-live/index.en.html)
+**Editing a `.prompt` file in an external editor**
+> Prompt-Live watches the folder automatically. Any change saved in an external editor is reloaded live without restarting the app.
 
 ---
 
-## Licence
+## License
 
-[MIT + Commons Clause](LICENSE) — libre d'utilisation et de modification, mais la revente du logiciel est interdite.
+[MIT + Commons Clause](LICENSE) — free to use and modify, but reselling the software is not permitted.
