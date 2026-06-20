@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://jfpucheu.github.io/prompt-live/index.en.html">🌐 Website — jfpucheu.github.io/prompt-live</a>
+  <a href="https://jfpucheu.github.io/prompt-live/">🌐 Website — jfpucheu.github.io/prompt-live</a>
 </p>
 
 > **Free alternative to ProPresenter, OnSong and SongShow Plus** — display lyrics and chords on stage screens with real-time iPad sync and Bluetooth pedal support.

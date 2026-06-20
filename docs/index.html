@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Prompt-Live — Prompteur pour musiciens, orateurs et conférenciers</title>
-<meta name="description" content="Application macOS pour afficher paroles, accords ou discours en temps réel sur scène. Défilement fluide, pédalier Bluetooth, synchronisation iPad."/>
+<title>Prompt-Live — Live prompter for musicians, speakers and presenters</title>
+<meta name="description" content="macOS & Windows app to display lyrics, chords or speech text in real time on stage. Smooth scrolling, Bluetooth pedal, iPad sync."/>
 <style>
   :root {
     --bg:        #07070e;
@@ -34,12 +34,10 @@
     overflow-x: hidden;
   }
 
-  /* ─── Scrollbar ─── */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
 
-  /* ─── Typography ─── */
   h1, h2, h3 { line-height: 1.2; }
   a { color: var(--acc2); text-decoration: none; }
   a:hover { color: var(--acc1); }
@@ -100,8 +98,6 @@
     padding: 80px 2rem 4rem;
     position: relative; overflow: hidden;
   }
-
-  /* Background lyric lines decoration */
   .bg-lines {
     position: absolute; inset: 0; pointer-events: none;
     display: flex; flex-direction: column; justify-content: center;
@@ -112,8 +108,6 @@
     background: white; margin: 28px 0;
     transform-origin: left;
   }
-
-  /* Radial glow behind hero content */
   #hero::before {
     content: '';
     position: absolute; top: 50%; left: 50%;
@@ -122,14 +116,12 @@
     background: radial-gradient(circle, rgba(42,42,96,0.5) 0%, transparent 70%);
     pointer-events: none;
   }
-
   .hero-logo {
     width: 130px; height: 130px;
     margin-bottom: 2rem;
     filter: drop-shadow(0 0 40px var(--glow));
     position: relative; z-index: 1;
   }
-
   .hero-title {
     font-family: var(--mono);
     font-size: clamp(2.8rem, 8vw, 5.5rem);
@@ -137,7 +129,6 @@
     letter-spacing: -0.02em;
     position: relative; z-index: 1;
   }
-
   .hero-sub {
     margin-top: 1rem;
     font-size: clamp(1rem, 2.5vw, 1.3rem);
@@ -145,7 +136,6 @@
     max-width: 520px;
     position: relative; z-index: 1;
   }
-
   .hero-badges {
     display: flex; flex-wrap: wrap; gap: 0.6rem;
     justify-content: center;
@@ -163,7 +153,6 @@
     width: 7px; height: 7px; border-radius: 50%;
     background: linear-gradient(135deg, var(--acc1), var(--acc2));
   }
-
   .hero-cta {
     display: flex; flex-wrap: wrap; gap: 1rem;
     justify-content: center;
@@ -190,10 +179,9 @@
   }
   .btn-outline:hover { border-color: rgba(255,179,64,0.4); color: var(--text); }
 
-  /* ─── Section wrapper ─── */
+  /* ─── Sections ─── */
   section { padding: 100px 2rem; }
   .container { max-width: 1100px; margin: 0 auto; }
-
   .section-label {
     font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -278,10 +266,7 @@
     transition: color 0.15s, border-color 0.15s;
     margin-bottom: -1px;
   }
-  .tab-btn.active {
-    color: var(--text);
-    border-bottom-color: var(--acc2);
-  }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--acc2); }
   .tab-btn:hover { color: var(--text); }
   .screenshot-panel { display: none; }
   .screenshot-panel.active { display: block; }
@@ -404,12 +389,6 @@
   }
   .footer-logo img { width: 22px; height: 22px; }
 
-  /* ─── Divider ─── */
-  .divider {
-    height: 1px; background: var(--line);
-    width: 100%; max-width: 1100px; margin: 0 auto;
-  }
-
   /* ─── Animations ─── */
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(24px); }
@@ -420,7 +399,6 @@
   .delay-2 { animation-delay: 0.2s; }
   .delay-3 { animation-delay: 0.3s; }
   .delay-4 { animation-delay: 0.45s; }
-  .delay-5 { animation-delay: 0.6s; }
 </style>
 </head>
 <body>
@@ -432,24 +410,23 @@
     prompt-live
   </div>
   <div class="nav-links">
-    <a href="#features">Fonctions</a>
-    <a href="#screenshots">Captures</a>
+    <a href="#features">Features</a>
+    <a href="#screenshots">Screenshots</a>
     <a href="#format">Format</a>
-    <a href="pedals.html">Pédaliers</a>
-    <a href="#download">Télécharger</a>
+    <a href="pedals.en.html">Pedals</a>
+    <a href="#download">Download</a>
     <a href="https://github.com/jfpucheu/prompt-live">GitHub ↗</a>
-    <a href="https://www.paypal.com/donate/?business=KZSZMWGEN8Z6W&no_recurring=0&currency_code=EUR" target="_blank" rel="noopener" class="btn-donate">♥ Donner</a>
+    <a href="https://www.paypal.com/donate/?business=KZSZMWGEN8Z6W&no_recurring=0&currency_code=EUR" target="_blank" rel="noopener" class="btn-donate">♥ Donate</a>
     <div class="lang-switch">
-      <span class="active-lang">FR</span>
+      <a href="index.fr.html">FR</a>
       <span style="opacity:0.3">|</span>
-      <a href="index.en.html">EN</a>
+      <span class="active-lang">EN</span>
     </div>
   </div>
 </nav>
 
 <!-- ─── Hero ─── -->
 <section id="hero">
-  <!-- Lyric lines background -->
   <div class="bg-lines" aria-hidden="true">
     <div class="bg-line" style="opacity:0.04; width:55%; margin-left:18%;"></div>
     <div class="bg-line" style="opacity:0.07; width:72%; margin-left:10%;"></div>
@@ -464,20 +441,20 @@
 
   <img src="prompt-live.svg" alt="Prompt-Live" class="hero-logo fade-up"/>
   <h1 class="hero-title fade-up delay-1"><span class="gradient-text">prompt-live</span></h1>
-  <p class="hero-sub fade-up delay-2">Prompteur plein écran pour musiciens, orateurs et conférenciers — paroles, accords ou discours sur grand écran, en temps réel.</p>
+  <p class="hero-sub fade-up delay-2">Full-screen prompter for musicians, speakers and presenters — lyrics, chords or speech text on a big screen, in real time.</p>
 
   <div class="hero-badges fade-up delay-3">
     <span class="badge"><span class="badge-dot"></span>macOS</span>
     <span class="badge"><span class="badge-dot"></span>Windows</span>
-    <span class="badge"><span class="badge-dot"></span>Musique live</span>
-    <span class="badge"><span class="badge-dot"></span>Discours &amp; prédications</span>
+    <span class="badge"><span class="badge-dot"></span>Live music</span>
+    <span class="badge"><span class="badge-dot"></span>Speeches &amp; sermons</span>
     <span class="badge"><span class="badge-dot"></span>Bluetooth</span>
     <span class="badge"><span class="badge-dot"></span>iPad sync</span>
   </div>
 
   <div class="hero-cta fade-up delay-4">
     <a href="#download" class="btn btn-primary">
-      ↓ Télécharger
+      ↓ Download
     </a>
     <a href="https://github.com/jfpucheu/prompt-live" class="btn btn-outline">
       GitHub ↗
@@ -492,29 +469,29 @@
       <div class="usecase-card">
         <div class="usecase-icon">🎶</div>
         <div>
-          <h3>Groupes live</h3>
-          <p>Paroles, accords et sections colorées par chanteur. Défilement piloté depuis la régie ou au pied avec un pédalier Bluetooth.</p>
+          <h3>Live bands</h3>
+          <p>Lyrics, chords and sections color-coded per singer. Scrolling controlled from the mixing desk or hands-free with a Bluetooth pedal.</p>
         </div>
       </div>
       <div class="usecase-card">
         <div class="usecase-icon">🎙️</div>
         <div>
-          <h3>Discours &amp; prédications</h3>
-          <p>Afficher un texte long sur un écran ou un retour scène. Avancer à son propre rythme, sans regarder ses notes.</p>
+          <h3>Speeches &amp; sermons</h3>
+          <p>Display long texts on a stage monitor. Move at your own pace, hands-free, without looking at your notes.</p>
         </div>
       </div>
       <div class="usecase-card">
         <div class="usecase-icon">🎭</div>
         <div>
-          <h3>Spectacles &amp; théâtre</h3>
-          <p>Souffleur numérique : le texte défile sur un écran visible de la scène, invisible du public.</p>
+          <h3>Stage &amp; theater</h3>
+          <p>Digital prompter: the text scrolls on a screen visible from the stage, hidden from the audience.</p>
         </div>
       </div>
       <div class="usecase-card">
         <div class="usecase-icon">📣</div>
         <div>
-          <h3>Conférences</h3>
-          <p>Prompteur de discours en plein écran. Vitesse et avancement contrôlés par pédale ou clavier, en toute discrétion.</p>
+          <h3>Conferences</h3>
+          <p>Full-screen speech prompter. Speed and position controlled by pedal or keyboard, with no visible interaction.</p>
         </div>
       </div>
     </div>
@@ -524,55 +501,55 @@
 <!-- ─── Features ─── -->
 <section id="features">
   <div class="container">
-    <p class="section-label">Fonctionnalités</p>
-    <h2 class="section-title">Tout ce qu'il faut pour la scène</h2>
-    <p class="section-desc">Conçu pour la scène : groupes live, orateurs, prédicateurs, comédiens — tout ce qui se dit ou se chante devant un public.</p>
+    <p class="section-label">Features</p>
+    <h2 class="section-title">Everything you need on stage</h2>
+    <p class="section-desc">Built for live performance: bands, speakers, preachers, actors — anything spoken or sung in front of an audience.</p>
 
     <div class="features-grid">
       <div class="feature-card">
         <div class="feature-icon">🎤</div>
-        <h3>Multi-chanteurs</h3>
-        <p>Chaque interprète a sa propre couleur. Les sections et les lignes sont colorées individuellement pour que chacun repère instantanément sa partie.</p>
+        <h3>Multi-singer colors</h3>
+        <p>Each performer gets their own color. Sections and individual lines are color-coded so everyone instantly finds their part.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🎸</div>
-        <h3>Accords alignés</h3>
-        <p>Les accords s'affichent au-dessus des paroles avec un alignement parfait garanti par la police monospace PT Mono embarquée.</p>
+        <h3>Aligned chords</h3>
+        <p>Chords appear above lyrics with pixel-perfect alignment, guaranteed by the bundled PT Mono monospace font.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📺</div>
-        <h3>Multi-écrans</h3>
-        <p>Le mode prompteur s'affiche automatiquement en plein écran sur l'écran externe — rétroprojection, TV de scène, ou tout autre affichage secondaire.</p>
+        <h3>Multi-screen</h3>
+        <p>Prompter mode automatically goes full-screen on the external display — projector, stage TV, or any secondary output.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🦶</div>
-        <h3>Pédalier Bluetooth</h3>
-        <p>Tout pédalier Bluetooth HID est supporté. Mode manuel (défilement, chanson suivante/précédente) ou <strong>mode défilement auto</strong> (démarrer, pauser, changer de chanson d'une simple pression). <a href="pedals.html">Voir les pédaliers compatibles →</a></p>
+        <h3>Bluetooth foot pedal</h3>
+        <p>Any Bluetooth HID pedal is supported. Manual mode (scroll, next/previous song) or <strong>auto-scroll mode</strong> (start, pause, change song with a single press). <a href="pedals.en.html">See compatible pedals →</a></p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📱</div>
-        <h3>Synchronisation iPad</h3>
-        <p>Serveur intégré accessible sur le réseau Wi-Fi local. Ouvrir <code style="font-size:0.82em;background:rgba(255,255,255,0.07);padding:1px 6px;border-radius:4px;font-family:'Courier New',monospace">http://prompt-live.local:8765</code> dans Safari — paroles, défilement et défilement auto synchronisés en temps réel.</p>
+        <h3>iPad sync</h3>
+        <p>Built-in server accessible on the local Wi-Fi network. Open <code style="font-size:0.82em;background:rgba(255,255,255,0.07);padding:1px 6px;border-radius:4px;font-family:'Courier New',monospace">http://prompt-live.local:8765</code> in Safari — lyrics, scroll and auto-scroll synced in real time.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">✏️</div>
-        <h3>Éditeur intégré</h3>
-        <p>Éditeur WYSIWYG avec prévisualisation instantanée. Modifier un fichier depuis n'importe quel éditeur externe — le prompteur se recharge automatiquement.</p>
+        <h3>Built-in editor</h3>
+        <p>WYSIWYG editor with live preview. Edit from any external editor — the prompter reloads automatically on save.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">⚡</div>
-        <h3>Défilement fluide</h3>
-        <p>Animation fluide avec 5 niveaux de vitesse pour la pédale et le clavier. Navigation ↑↓ défilement, ←→ chanson précédente/suivante.</p>
+        <h3>Smooth scrolling</h3>
+        <p>Fluid animation with 5 speed levels for both pedal and keyboard. ↑↓ to scroll, ←→ for previous/next song.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📂</div>
-        <h3>Setlist auto</h3>
-        <p>Charger un dossier de fichiers <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:4px;font-family:var(--mono)">.prompt</code> numérotés — l'ordre de passage est automatique.</p>
+        <h3>Auto setlist</h3>
+        <p>Load a folder of numbered <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:4px;font-family:var(--mono)">.prompt</code> files — the running order is set automatically.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🕐</div>
-        <h3>Horloge de scène</h3>
-        <p>Horloge affichée dans la fenêtre de contrôle pour garder un œil sur le timing du concert sans quitter l'interface.</p>
+        <h3>Stage clock</h3>
+        <p>Clock displayed in the control window to keep an eye on show timing without leaving the interface.</p>
       </div>
     </div>
   </div>
@@ -581,33 +558,33 @@
 <!-- ─── Screenshots ─── -->
 <section id="screenshots">
   <div class="container">
-    <p class="section-label">Captures d'écran</p>
-    <h2 class="section-title">L'interface en situation</h2>
-    <p class="section-desc">Trois fenêtres, un seul workflow : contrôle depuis la régie, affichage plein écran, édition en live.</p>
+    <p class="section-label">Screenshots</p>
+    <h2 class="section-title">The interface in action</h2>
+    <p class="section-desc">Three windows, one workflow: control from the mixing desk, full-screen display, live editing.</p>
 
     <div class="screenshots-tabs">
-      <button class="tab-btn active" onclick="showTab('ctrl')">Fenêtre de contrôle</button>
-      <button class="tab-btn" onclick="showTab('prompter')">Mode prompteur</button>
-      <button class="tab-btn" onclick="showTab('editor')">Éditeur</button>
+      <button class="tab-btn active" onclick="showTab('ctrl')">Control window</button>
+      <button class="tab-btn" onclick="showTab('prompter')">Prompter mode</button>
+      <button class="tab-btn" onclick="showTab('editor')">Editor</button>
     </div>
 
     <div id="tab-ctrl" class="screenshot-panel active">
       <div class="screenshot-img" style="max-width: 320px;">
-        <img src="screen-control.png" alt="Fenêtre de contrôle Prompt-Live"/>
+        <img src="screen-control.png" alt="Prompt-Live control window"/>
       </div>
-      <p class="screenshot-caption">// fenêtre de contrôle — navigation, vitesse, pédale, horloge</p>
+      <p class="screenshot-caption">// control window — navigation, speed, pedal, clock</p>
     </div>
     <div id="tab-prompter" class="screenshot-panel">
       <div class="screenshot-img">
-        <img src="screen-prompter.png" alt="Mode prompteur Prompt-Live"/>
+        <img src="screen-prompter.png" alt="Prompt-Live prompter mode"/>
       </div>
-      <p class="screenshot-caption">// mode prompteur — affichage plein écran sur écran externe</p>
+      <p class="screenshot-caption">// prompter mode — full-screen on external display</p>
     </div>
     <div id="tab-editor" class="screenshot-panel">
       <div class="screenshot-img">
-        <img src="screen-editor.png" alt="Éditeur Prompt-Live"/>
+        <img src="screen-editor.png" alt="Prompt-Live editor"/>
       </div>
-      <p class="screenshot-caption">// éditeur intégré — WYSIWYG avec prévisualisation instantanée</p>
+      <p class="screenshot-caption">// built-in editor — WYSIWYG with live preview</p>
     </div>
   </div>
 </section>
@@ -615,9 +592,9 @@
 <!-- ─── Format ─── -->
 <section id="format">
   <div class="container">
-    <p class="section-label">Format .prompt</p>
-    <h2 class="section-title">Syntaxe simple, résultat précis</h2>
-    <p class="section-desc">Des fichiers texte lisibles par n'importe quel éditeur. Une syntaxe légère pour définir paroles, accords, sections et couleurs.</p>
+    <p class="section-label">.prompt format</p>
+    <h2 class="section-title">Simple syntax, precise result</h2>
+    <p class="section-desc">Plain text files readable by any editor. A lightweight syntax to define lyrics, chords, sections and colors.</p>
 
     <div class="format-split">
       <div>
@@ -633,11 +610,11 @@
 <span class="c-tag">@Clara:</span> <span class="c-val">Violet</span>
 
 <span class="c-section">[Intro]</span>
-<span class="c-note">(Guitare acoustique — capo 2)</span>
+<span class="c-note">(Acoustic guitar — capo 2)</span>
 <span class="c-chord">G         Cmaj7/E</span>
 Amazing grace, how sweet the sound
 
-<span class="c-section">[Couplet 1]</span><span class="c-tag">@Alice</span>
+<span class="c-section">[Verse 1]</span><span class="c-tag">@Alice</span>
 <span class="c-chord">D          G</span>
 That saved a wretch like me <span class="c-tag">@Bob</span>
 <span class="c-chord">G          D</span>
@@ -648,43 +625,43 @@ I once was lost, but now am found</div>
         <li>
           <div class="ff-icon">⚙️</div>
           <div>
-            <div class="ff-label">En-tête de configuration</div>
-            <div class="ff-desc">Titre, tailles de police, couleurs, vitesse de défilement — tout est réglable par chanson.</div>
+            <div class="ff-label">Configuration header</div>
+            <div class="ff-desc">Title, font sizes, colors, scroll speed — everything is per-song.</div>
           </div>
         </li>
         <li>
           <div class="ff-icon">🏷️</div>
           <div>
-            <div class="ff-label">Balises chanteurs @Prenom</div>
-            <div class="ff-desc">Définir une couleur par chanteur en en-tête, puis annoter chaque ligne ou section.</div>
+            <div class="ff-label">Singer tags @Name</div>
+            <div class="ff-desc">Define a color per singer in the header, then annotate each line or section.</div>
           </div>
         </li>
         <li>
           <div class="ff-icon">🎵</div>
           <div>
-            <div class="ff-label">Détection automatique des accords</div>
-            <div class="ff-desc">Toute ligne dont les tokens matchent <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">[A-G][#b]?...</code> est rendue comme accord.</div>
+            <div class="ff-label">Automatic chord detection</div>
+            <div class="ff-desc">Any line whose tokens match <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">[A-G][#b]?...</code> is rendered as a chord line.</div>
           </div>
         </li>
         <li>
           <div class="ff-icon">📝</div>
           <div>
-            <div class="ff-label">Notes et indications de jeu</div>
-            <div class="ff-desc">Lignes entre parenthèses affichées en italique gris — instructions pour les musiciens.</div>
+            <div class="ff-label">Notes and stage directions</div>
+            <div class="ff-desc">Lines in parentheses are displayed in italic grey — instructions for the musicians.</div>
           </div>
         </li>
         <li>
           <div class="ff-icon">🔢</div>
           <div>
-            <div class="ff-label">Ordre de setlist automatique</div>
-            <div class="ff-desc">Préfixer les fichiers avec un numéro : <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">01_...</code>, <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">02_...</code></div>
+            <div class="ff-label">Automatic setlist order</div>
+            <div class="ff-desc">Prefix files with a number: <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">01_...</code>, <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">02_...</code></div>
           </div>
         </li>
         <li>
           <div class="ff-icon">🎨</div>
           <div>
-            <div class="ff-label">10 couleurs nommées + hex</div>
-            <div class="ff-desc">rouge, bleu, vert, orange, jaune, violet, cyan, rose, blanc, gris — ou n'importe quel <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">#RRGGBB</code>.</div>
+            <div class="ff-label">10 named colors + hex</div>
+            <div class="ff-desc">rouge, bleu, vert, orange, jaune, violet, cyan, rose, blanc, gris — or any <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 4px;border-radius:3px;font-family:var(--mono)">#RRGGBB</code> code.</div>
           </div>
         </li>
       </ul>
@@ -695,50 +672,49 @@ I once was lost, but now am found</div>
 <!-- ─── Download ─── -->
 <section id="download">
   <div class="container">
-    <p class="section-label">Téléchargement</p>
-    <h2 class="section-title">Prêt pour la scène</h2>
-    <p class="section-desc">Binaires compilés pour macOS, disponibles sur la page Releases GitHub.</p>
+    <p class="section-label">Download</p>
+    <h2 class="section-title">Ready for the stage</h2>
+    <p class="section-desc">Pre-built binaries for macOS and Windows, available on the GitHub Releases page.</p>
 
     <div class="download-grid">
       <div class="download-card">
         <h3>macOS — Apple Silicon</h3>
         <div class="arch">M1 · M2 · M3 · M4</div>
-        <p>Build natif ARM pour tous les Mac avec puce Apple Silicon. Performances maximales, consommation minimale.</p>
+        <p>Native ARM build for all Apple Silicon Macs. Maximum performance, minimal power draw.</p>
         <a href="https://github.com/jfpucheu/prompt-live/releases/latest" class="btn btn-primary">
-          ↓ Télécharger .zip
+          ↓ Download .zip
         </a>
       </div>
       <div class="download-card">
         <h3>macOS — Intel</h3>
         <div class="arch">x86_64</div>
-        <p>Build natif x86 pour les Mac Intel. Entièrement compatible avec les versions macOS récentes.</p>
+        <p>Native x86 build for Intel Macs. Fully compatible with recent macOS versions.</p>
         <a href="https://github.com/jfpucheu/prompt-live/releases/latest" class="btn btn-primary">
-          ↓ Télécharger .zip
+          ↓ Download .zip
         </a>
       </div>
       <div class="download-card">
         <h3>Windows</h3>
         <div class="arch">x64</div>
-        <p>Build natif Windows 10/11 x64. Dézipper et lancer <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:4px;font-family:var(--mono)">Prompt-Live.exe</code> directement, sans installation.</p>
+        <p>Native Windows 10/11 x64 build. Unzip and run <code style="font-size:0.8em;background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:4px;font-family:var(--mono)">Prompt-Live.exe</code> directly, no installer needed.</p>
         <a href="https://github.com/jfpucheu/prompt-live/releases/latest" class="btn btn-primary">
-          ↓ Télécharger .zip
+          ↓ Download .zip
         </a>
       </div>
     </div>
 
     <div class="install-note">
-      <strong>Sécurité macOS</strong>
-      <p>L'application n'est pas notarisée Apple. Si macOS bloque le lancement, ouvrir un Terminal et exécuter :<br/>
+      <strong>macOS security</strong>
+      <p>The app is not Apple-notarized. If macOS blocks the launch, open a Terminal and run:<br/>
       <code>xattr -dr com.apple.quarantine /Applications/Prompt-Live.app</code><br/>
-      Puis relancer l'application normalement. À faire une seule fois.</p>
+      Then relaunch normally. Only needed once.</p>
     </div>
     <div class="install-note" style="margin-top:1rem; border-left-color: #60aaff;">
-      <strong>Sécurité Windows</strong>
-      <p>Windows SmartScreen peut afficher un avertissement au premier lancement. Cliquer sur <em>Informations complémentaires</em> puis <em>Exécuter quand même</em>. À faire une seule fois.</p>
+      <strong>Windows security</strong>
+      <p>Windows SmartScreen may show a warning on first launch. Click <em>More info</em> then <em>Run anyway</em>. Only needed once.</p>
     </div>
-
     <div class="install-note" style="margin-top:1rem; border-left-color: var(--acc2);">
-      <strong>Installation depuis les sources</strong>
+      <strong>Run from source</strong>
       <p>
         <code>git clone https://github.com/jfpucheu/prompt-live.git</code><br/>
         <code>cd prompt-live &amp;&amp; python3 -m venv .venv &amp;&amp; source .venv/bin/activate</code><br/>
@@ -759,13 +735,13 @@ I once was lost, but now am found</div>
     &nbsp;·&nbsp;
     <a href="https://github.com/jfpucheu/prompt-live/releases">Releases</a>
     &nbsp;·&nbsp;
-    <a href="https://github.com/jfpucheu/prompt-live/blob/main/LICENSE">Licence MIT + Commons Clause</a>
+    <a href="https://github.com/jfpucheu/prompt-live/blob/main/LICENSE">MIT + Commons Clause License</a>
   </p>
   <p style="margin-top:0.5rem; font-size:0.78rem; opacity:0.5;">
-    Libre d'utilisation et de modification — la revente est interdite.
+    Free to use and modify — reselling the software is not permitted.
   </p>
   <p style="margin-top:1.2rem;">
-    <a href="https://www.paypal.com/donate/?business=KZSZMWGEN8Z6W&no_recurring=0&currency_code=EUR" target="_blank" rel="noopener" class="btn-donate" style="font-size:0.85rem; padding:8px 20px;">♥ Soutenir le projet</a>
+    <a href="https://www.paypal.com/donate/?business=KZSZMWGEN8Z6W&no_recurring=0&currency_code=EUR" target="_blank" rel="noopener" class="btn-donate" style="font-size:0.85rem; padding:8px 20px;">♥ Support the project</a>
   </p>
 </footer>
 
