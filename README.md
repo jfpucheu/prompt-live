@@ -4,6 +4,7 @@
 
 <h1 align="center">Prompt-Live</h1>
 <p align="center"><em>Prompteur musical pour groupes live — paroles & accords sur grand écran</em></p>
+<p align="center"><em>Free open-source stage prompter for live bands — lyrics, chords & iPad sync</em></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS-lightgrey?logo=apple"/>
@@ -14,8 +15,12 @@
 </p>
 
 <p align="center">
-  <a href="https://jfpucheu.github.io/prompt-live/">🌐 Site web — jfpucheu.github.io/prompt-live</a>
+  <a href="https://jfpucheu.github.io/prompt-live/">🌐 Website — jfpucheu.github.io/prompt-live</a>
+  &nbsp;|&nbsp;
+  <a href="https://jfpucheu.github.io/prompt-live/index.en.html">🇬🇧 English</a>
 </p>
+
+> **Free alternative to ProPresenter, OnSong and SongShow Plus** — display lyrics and chords on stage screens with real-time iPad sync and Bluetooth pedal support.
 
 ---
 
@@ -106,6 +111,7 @@ TailleParoles: 32
 TailleAccords: 18
 CouleurSection: jaune
 CouleurAccords: gris
+Vitesse: 2
 
 @Vanessa: Rouge
 @Guillaume: Bleu
@@ -121,6 +127,7 @@ CouleurAccords: gris
 | `CouleurSection:` | Couleur des titres de section | `#AAAAAA` |
 | `CouleurAccords:` | Couleur des accords | `#888888` |
 | `AfficherAccords:` | `oui` / `non` | `oui` |
+| `Vitesse:` | Vitesse de défilement auto pour cette chanson (1–5) | _(vitesse globale)_ |
 | `@Prenom: couleur` | Définit la couleur d'un chanteur | — |
 
 ### Contenu
@@ -271,6 +278,22 @@ git push origin v1.0.0
 
 **Modifier un fichier `.prompt` depuis un éditeur externe**
 > Prompt-Live surveille le dossier automatiquement. Toute modification enregistrée dans un éditeur externe est rechargée en direct sans redémarrer l'app.
+
+---
+
+## English summary
+
+**Prompt-Live** is a free, open-source stage prompter for live bands and worship teams.
+
+- Display **lyrics and chords** full-screen on an external monitor or projector
+- **Color-code singers** — each vocalist gets their own color, per line or per section
+- **Auto-scroll** with 5 speed levels, controllable via Bluetooth foot pedal
+- **Real-time iPad sync** — any browser on the same Wi-Fi follows the scroll
+- **Per-song scroll speed** — set `Vitesse: 3` in the song file to override the global speed
+- Plain text `.prompt` files — edit with any text editor, version-controllable
+- Free alternative to **ProPresenter**, **OnSong**, **SongShow Plus**
+
+👉 [Full English documentation](https://jfpucheu.github.io/prompt-live/index.en.html)
 
 ---
 
