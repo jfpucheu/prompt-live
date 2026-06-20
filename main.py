@@ -137,11 +137,11 @@ def _load_bundled_fonts():
 
 from parsers import load_songs, Song
 
-_SPEED_PX = {1: 60, 2: 100, 3: 160, 4: 240, 5: 340}
+_SPEED_PX = {1: 40, 2: 70, 3: 110, 4: 160, 5: 220, 6: 290, 7: 370, 8: 460, 9: 560, 10: 680}
 _ANIM_MS  = 380
 
-_AUTO_SCROLL_SPEEDS      = {1: 20, 2: 40, 3: 60, 4: 90, 5: 130}  # px/seconde
-_AUTO_SCROLL_INTERVAL_MS = 50
+_AUTO_SCROLL_SPEEDS      = {1: 15, 2: 28, 3: 45, 4: 65, 5: 90, 6: 120, 7: 155, 8: 195, 9: 240, 10: 290}  # px/seconde
+_AUTO_SCROLL_INTERVAL_MS = 16
 
 # ─── Support pédale Bluetooth ─────────────────────────────────────────────────
 # Touches interceptées globalement pour la pédale (configurables ici)
@@ -411,7 +411,7 @@ class PrompterWindow(QMainWindow):
 
     def __init__(self, songs: list[Song], start_index: int = 0, on_navigate=None, on_scroll=None, on_display=None,
                  font_family: str = "'Courier New',Courier,monospace", scroll_speed: int = 3,
-                 on_autoscroll=None):
+                 on_autoscroll=None, on_close=None):
         super().__init__()
         self.songs = songs
         self.current_index = start_index
@@ -419,6 +419,7 @@ class PrompterWindow(QMainWindow):
         self._show_chords: bool | None = None
         self._on_navigate   = on_navigate
         self._on_scroll     = on_scroll
+        self._on_close      = on_close
         self._on_display    = on_display
         self._on_autoscroll = on_autoscroll  # callable(active: bool)
         self._scroll_speed  = scroll_speed
@@ -507,7 +508,8 @@ class PrompterWindow(QMainWindow):
         layout.addWidget(hint)
 
         # Raccourcis clavier
-        QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
+        QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
+                  self._on_close if self._on_close else self.close)
         QShortcut(QKeySequence("Ctrl+="),  self, self._zoom_in)
         QShortcut(QKeySequence("Ctrl+-"),  self, self._zoom_out)
         QShortcut(QKeySequence("A"),       self, self._toggle_chords)
@@ -907,7 +909,7 @@ class ControlWindow(QMainWindow):
         self._lbl_scroll = QLabel(_t("scroll_label"))
         speed_row.addWidget(self._lbl_scroll)
         self._speed_slider = QSlider(Qt.Orientation.Horizontal)
-        self._speed_slider.setRange(1, 5)
+        self._speed_slider.setRange(1, 10)
         self._speed_slider.setValue(self._scroll_speed)
         self._speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self._speed_slider.setTickInterval(1)
@@ -927,7 +929,7 @@ class ControlWindow(QMainWindow):
         self._lbl_as_slow = QLabel(_t("slow")); self._lbl_as_slow.setStyleSheet("font-size:10px;color:#888;")
         as_row.addWidget(self._lbl_as_slow)
         self._as_speed_slider = QSlider(Qt.Orientation.Horizontal)
-        self._as_speed_slider.setRange(1, 5)
+        self._as_speed_slider.setRange(1, 10)
         self._as_speed_slider.setValue(self._autoscroll_speed)
         self._as_speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self._as_speed_slider.setTickInterval(1)
@@ -949,7 +951,7 @@ class ControlWindow(QMainWindow):
         self._lbl_pedal_speed = QLabel(_t("speed_label"))
         pedal_row.addWidget(self._lbl_pedal_speed)
         self._pedal_speed_slider = QSlider(Qt.Orientation.Horizontal)
-        self._pedal_speed_slider.setRange(1, 5)
+        self._pedal_speed_slider.setRange(1, 10)
         self._pedal_speed_slider.setValue(pedal_speed)
         self._pedal_speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self._pedal_speed_slider.setTickInterval(1)
@@ -1098,8 +1100,9 @@ class ControlWindow(QMainWindow):
 
     def _on_autoscroll_toggled(self, checked: bool):
         self._pedal_filter.autoscroll_mode = checked
-        for p in self._prompters:
-            p.set_auto_scroll_active(checked)
+        if not checked:
+            for p in self._prompters:
+                p.view.stop_auto_scroll()
         self._web_server.push_autoscroll(checked)
 
     def _on_autoscroll_speed_changed(self, value: int):
@@ -1320,7 +1323,8 @@ class ControlWindow(QMainWindow):
                                on_display=self._web_server.push_song if i == 0 else None,
                                font_family=self._css_font(),
                                scroll_speed=self._scroll_speed,
-                               on_autoscroll=self._on_autoscroll_state if i == 0 else None)
+                               on_autoscroll=self._on_autoscroll_state if i == 0 else None,
+                               on_close=self._stop)
             p.set_auto_scroll_speed(self._autoscroll_speed)
             p.setGeometry(scr.geometry())
             p.showFullScreen()

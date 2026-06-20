@@ -177,7 +177,7 @@ def _parse_lines(lines: list, file_path: str) -> Song:
         elif sl.startswith("vitesse:"):
             try:
                 v = int(stripped.split(":", 1)[1].strip())
-                speed = max(1, min(5, v))
+                speed = max(1, min(10, v))
             except ValueError:
                 pass
         elif sl.startswith("couleursection:"):

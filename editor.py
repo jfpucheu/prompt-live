@@ -129,6 +129,7 @@ class _SettingsPanel(QScrollArea):
     tag_deleted           = pyqtSignal(str)        # (name)
     show_chords_changed   = pyqtSignal(bool)
     transpose_changed     = pyqtSignal(int)
+    speed_changed         = pyqtSignal(int)
     meta_changed          = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -155,6 +156,12 @@ class _SettingsPanel(QScrollArea):
         self._sz_transpose.valueChanged.connect(self.transpose_changed)
         self._sz_transpose.valueChanged.connect(lambda _: self.meta_changed.emit())
         self._add_row("Transpo", self._sz_transpose)
+
+        self._sz_speed = self._spinbox(0, 10)
+        self._sz_speed.setSpecialValueText("global")
+        self._sz_speed.valueChanged.connect(self.speed_changed)
+        self._sz_speed.valueChanged.connect(lambda _: self.meta_changed.emit())
+        self._add_row("Vitesse", self._sz_speed)
 
         # ── Tailles ───────────────────────────────────────────────────────────
         self._vbox.addWidget(self._sep_label("TAILLES (px)"))
@@ -210,6 +217,7 @@ class _SettingsPanel(QScrollArea):
         for w, sig, val in [
             (self._titre,        'textChanged', song.title),
             (self._sz_transpose, 'valueChanged', song.transpose),
+            (self._sz_speed,     'valueChanged', song.speed or 0),
             (self._sz_lyrics,    'valueChanged', song.font_lyrics),
             (self._sz_chords,    'valueChanged', song.font_chords),
             (self._sz_section,   'valueChanged', song.font_section),
@@ -300,6 +308,7 @@ class _SettingsPanel(QScrollArea):
     def titre(self):       return self._titre.text().strip()
     def show_chords(self): return self._show_chords.isChecked()
     def transpose(self):   return self._sz_transpose.value()
+    def speed(self):       return self._sz_speed.value() or None  # 0 → None (global)
 
     # ── Helpers UI ────────────────────────────────────────────────────────────
 
@@ -1015,6 +1024,8 @@ class EditorWindow(QMainWindow):
         ]
         if not p.show_chords():
             lines.append("AfficherAccords: non")
+        if p.speed():
+            lines.append(f"Vitesse: {p.speed()}")
         if s.tag_names:
             lines.append("")
             for key, orig in s.tag_names.items():

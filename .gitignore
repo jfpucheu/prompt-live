@@ -31,3 +31,7 @@ logo/*.iconset/
 
 # Notes personnelles
 TODO.md
+
+# GitHub Actions self-hosted runner (contient des credentials)
+actions-runner/
+test_longpress.py
