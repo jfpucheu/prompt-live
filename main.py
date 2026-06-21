@@ -1337,7 +1337,6 @@ class ControlWindow(QMainWindow):
         for p in self._prompters:
             p.close()
         self._prompters.clear()
-        self._autoscroll_cb.setChecked(False)
         self.btn_stop.setEnabled(False)
         self.btn_launch.setEnabled(bool(self.songs))
         self._web_server.push_setlist([s.title for s in self.songs])

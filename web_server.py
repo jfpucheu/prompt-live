@@ -61,7 +61,7 @@ body {
   min-height: 100dvh;
   background: #000; color: #fff;
   overflow-x: hidden;
-  padding: 24px 32px 80px;
+  padding: 24px 32px 104px;
 }
 #dot {
   position: fixed; top: 14px; right: 14px;
@@ -157,6 +157,24 @@ body.follower .ctrl-btn-row { display: none; }
 .cb:active { background: #2a2a2a; color: #fff; }
 #btn-auto { color: #444; }
 #btn-auto.on { color: #00cc66; }
+/* ── Barre de mode (toujours visible) ────────────────────────────────────── */
+#ctrl-mode-row {
+  height: 40px;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 14px 6px;
+  border-top: 1px solid #111;
+}
+body.follower #ctrl-mode-row { border-top: none; padding-bottom: 8px; }
+#btn-mode {
+  background: none; border: 1px solid #222; color: #444;
+  font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 20px;
+  cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+  transition: color .1s, border-color .1s, background .1s;
+}
+#btn-mode:active { background: #1a1a1a; color: #aaa; border-color: #444; }
 /* ── Sélection du mode ───────────────────────────────────────────────────── */
 #mode-overlay {
   display: none; position: fixed; inset: 0;
@@ -186,7 +204,7 @@ body.follower .ctrl-btn-row { display: none; }
 .mo-name { color: #fff; font-size: 20px; font-weight: 600; margin-bottom: 6px; }
 .mo-desc { color: #555; font-size: 13px; line-height: 1.5; }
 .mo-hint { color: #222; font-size: 12px; text-align: center; padding: 0 32px; }
-body.follower { padding-bottom: 24px; }
+body.follower { padding-bottom: 40px; }
 /* ── Overlay setlist ─────────────────────────────────────────────────────── */
 #list-overlay {
   display: none; position: fixed; inset: 0;
@@ -248,7 +266,7 @@ body.follower { padding-bottom: 24px; }
       <div class="mo-desc" data-i18n="moCommDesc">Pilotage du<br>prompteur</div>
     </div>
   </div>
-  <p class="mo-hint" data-i18n="moHint">Appui long sur &#x25CF; pour changer de mode</p>
+  <p class="mo-hint" data-i18n="moHint">Appuie sur le bouton <em>Mode</em> en bas pour changer</p>
 </div>
 <div id="list-overlay">
   <div id="list-head">
@@ -265,6 +283,9 @@ body.follower { padding-bottom: 24px; }
     <button class="cb" onclick="sendCmd({cmd:'scroll',d:'down'})">&#x25BC;</button>
     <button class="cb" onclick="sendCmd({cmd:'next'})">&#x27A1;</button>
     <button class="cb" onclick="openList()">&#x2630;</button>
+  </div>
+  <div id="ctrl-mode-row">
+    <button id="btn-mode" onclick="openModeOverlay()">Mode</button>
   </div>
 </div>
 <div id="pwa-hint">
@@ -286,7 +307,8 @@ const _t = {
   moFollDesc: _en ? 'Synchronized display<br>no control'   : 'Affichage synchronisé<br>sans contrôle',
   moCommands: _en ? 'Commands'                             : 'Commandes',
   moCommDesc: _en ? 'Prompter<br>control'                  : 'Pilotage du<br>prompteur',
-  moHint:     _en ? 'Long press ● to change mode'     : 'Appui long sur ● pour changer de mode',
+  moHint:     _en ? 'Tap the <em>Mode</em> button below to change' : 'Appuie sur le bouton <em>Mode</em> en bas pour changer',
+  modeLabel:  _en ? 'Mode'     : 'Mode',
 };
 document.querySelectorAll('[data-i18n]').forEach(el => {
   const v = _t[el.dataset.i18n];
@@ -296,6 +318,10 @@ document.querySelectorAll('[data-i18n]').forEach(el => {
 // ── Mode suiveur / commandes ───────────────────────────────────────────────
 function applyMode(mode) {
   document.body.classList.toggle('follower', mode === 'follower');
+  const btn = document.getElementById('btn-mode');
+  if (btn) btn.textContent = mode === 'follower'
+    ? (_en ? 'Follower' : 'Suiveur')
+    : (_en ? 'Commands' : 'Commandes');
 }
 
 function setMode(mode) {
@@ -303,24 +329,16 @@ function setMode(mode) {
   applyMode(mode);
   document.getElementById('mode-overlay').classList.remove('open');
 }
-(function initMode() {
-  const saved = localStorage.getItem('pl-mode');
-  if (saved) { applyMode(saved); }
-  else { document.getElementById('mode-overlay').classList.add('open'); }
-})();
 
-// Appui long sur le point de connexion pour changer de mode
-let _modeTimer = null;
-dot.addEventListener('touchstart', () => {
-  _modeTimer = setTimeout(() => {
-    document.getElementById('mode-overlay').classList.add('open');
-  }, 800);
-}, { passive: true });
-['touchend', 'touchcancel'].forEach(ev =>
-  dot.addEventListener(ev, () => {
-    if (_modeTimer) { clearTimeout(_modeTimer); _modeTimer = null; }
-  }, { passive: true })
-);
+function openModeOverlay() {
+  document.getElementById('mode-overlay').classList.add('open');
+}
+
+(function initMode() {
+  const saved = localStorage.getItem('pl-mode') || 'follower';
+  if (!localStorage.getItem('pl-mode')) localStorage.setItem('pl-mode', 'follower');
+  applyMode(saved);
+})();
 
 // ── Fullscreen ────────────────────────────────────────────────────────────
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -370,18 +388,30 @@ function renderSetlist(songs) {
 }
 
 // ── Wake Lock (empêche la mise en veille de l'écran) ─────────────────────
-// Méthode 1 : API native (fonctionne en HTTPS)
+// Méthode 1 : API native Screen Wake Lock (HTTPS uniquement)
 let _wakeLock = null;
 async function requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
   try { _wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
 }
 
-// Méthode 2 : flux vidéo depuis un canvas (fonctionne en HTTP, déclenché au
-// premier toucher car iOS exige un geste utilisateur pour jouer une vidéo)
+// Méthode 2 : vidéo canvas 1×1 px en boucle (fonctionne en HTTP sur iOS).
+// Nécessite un geste utilisateur pour démarrer, puis se maintient seule.
+// Un timer de 25 s relance la vidéo si iOS la met en pause silencieusement.
 let _wakeVideo = null;
+let _wakeTimer = null;
+
+function _keepVideoAlive() {
+  clearTimeout(_wakeTimer);
+  if (_wakeVideo && _wakeVideo.paused) _wakeVideo.play().catch(() => {});
+  _wakeTimer = setTimeout(_keepVideoAlive, 25000);
+}
+
 function startVideoWakeLock() {
-  if (_wakeVideo) return;
+  if (_wakeVideo) {
+    if (_wakeVideo.paused) _wakeVideo.play().catch(() => {});
+    return;
+  }
   try {
     const c = document.createElement('canvas');
     c.width = 1; c.height = 1;
@@ -395,18 +425,20 @@ function startVideoWakeLock() {
       'position:fixed;top:-1px;left:-1px;width:1px;height:1px;opacity:.01;';
     document.body.appendChild(_wakeVideo);
     _wakeVideo.play().catch(() => {});
+    _keepVideoAlive();
   } catch (_) {}
 }
 
 requestWakeLock();
+// Pas de { once } : chaque toucher peut relancer la vidéo si elle a été stoppée
 document.addEventListener('touchstart', () => {
   requestWakeLock();
   startVideoWakeLock();
-}, { once: true, passive: true });
+}, { passive: true });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   requestWakeLock();
-  if (_wakeVideo && _wakeVideo.paused) _wakeVideo.play().catch(() => {});
+  startVideoWakeLock();
 });
 
 // ── Interleaving accords / paroles ────────────────────────────────────────
